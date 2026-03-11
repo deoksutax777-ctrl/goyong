@@ -1573,8 +1573,8 @@ async function downloadExcel() {
       header: 0, footer: 0
     };
 
-    // 열 너비
-    [10.3,8.5,7,7,6.5,5.5,6,10.3,9.4,6,7,6,7.5,9.5,5.7,5.7,6,6,6,6]
+    // 열 너비 (글자 잘림 방지를 위해 넉넉하게)
+    [12, 9, 7.5, 9, 7, 6.5, 7, 12, 9.5, 7.5, 7.5, 7, 8.5, 11, 7, 7, 7.5, 7.5, 7.5, 7.5]
       .forEach((w,i) => ws.getColumn(i+1).width = w);
 
     // ── 핵심 규칙: SC() 먼저 → mergeCells() 나중 ──
@@ -1612,9 +1612,9 @@ async function downloadExcel() {
     ws.getRow(3).height  = 22;
     ws.getRow(4).height  = 22;
     ws.getRow(5).height  = 22;
-    ws.getRow(6).height  = 52;
-    ws.getRow(7).height  = 32;
-    ws.getRow(8).height  = 14;
+    ws.getRow(6).height  = 58;
+    ws.getRow(7).height  = 38;
+    ws.getRow(8).height  = 16;
     ws.getRow(9).height  = 22;
     ws.getRow(10).height = 22;
     ws.getRow(11).height = 22;
@@ -1635,19 +1635,19 @@ async function downloadExcel() {
 
     // ── 집계표 헤더 ────────────────────────
     MG(6,1,8,2,   '구 분', {bg:GRAY, bold:true});
-    MG(6,3,8,3,   '①해당(직전)\n과세연도의\n상시근로자\n근무개월수의\n합계', {bg:GRAY});
-    MG(6,4,8,4,   '②\n과세연도\n개월수', {bg:GRAY});
-    MG(6,5,8,5,   '③상시\n근로자수\n(1인당÷②\n버림의 합)', {bg:GRAY});
-    MG(6,6,6,11,  '④해당(직전) 과세연도의 청년등 상시근로자 근무개월수의 합계', {bg:GRAY, bold:true});
-    MG(7,6,8,6,   '⑤\n청년', {bg:GRAY});
-    MG(7,7,8,7,   '⑥\n장애인', {bg:GRAY});
-    MG(7,8,8,8,   '⑦\n고령자', {bg:GRAY});
-    MG(7,9,8,9,   '⑧\n경력단절\n근로자', {bg:GRAY});
-    MG(7,10,8,10, '⑨\n북한이탈\n주민', {bg:GRAY});
-    MG(7,11,8,11, '⑩\n합계', {bg:GRAY});
-    MG(6,12,8,12, '⑪\n과세연도\n개월수', {bg:GRAY});
-    MG(6,13,8,15, '⑫\n청년등상시\n근로자수\n(1인당÷⑪\n버림의 합)', {bg:GRAY});
-    MG(6,16,8,20, '⑬\n청년등외\n상시근로자수\n(=③-⑫)', {bg:GRAY});
+    MG(6,3,8,3,   '①해당(직전)\n과세연도의\n상시근로자\n근무개월수의\n합계', {bg:GRAY, sz:8});
+    MG(6,4,8,4,   '②\n과세연도\n개월수', {bg:GRAY, sz:8});
+    MG(6,5,8,5,   '③상시\n근로자수\n(1인당÷②\n버림의 합)', {bg:GRAY, sz:8});
+    MG(6,6,6,11,  '④해당(직전) 과세연도의 청년등 상시근로자 근무개월수의 합계', {bg:GRAY, bold:true, sz:8});
+    MG(7,6,8,6,   '⑤\n청년', {bg:GRAY, sz:8});
+    MG(7,7,8,7,   '⑥\n장애인', {bg:GRAY, sz:8});
+    MG(7,8,8,8,   '⑦\n고령자', {bg:GRAY, sz:8});
+    MG(7,9,8,9,   '⑧\n경력단절\n근로자', {bg:GRAY, sz:8});
+    MG(7,10,8,10, '⑨\n북한이탈\n주민', {bg:GRAY, sz:8});
+    MG(7,11,8,11, '⑩\n합계', {bg:GRAY, sz:8});
+    MG(6,12,8,12, '⑪\n과세연도\n개월수', {bg:GRAY, sz:8});
+    MG(6,13,8,15, '⑫\n청년등상시\n근로자수\n(1인당÷⑪\n버림의 합)', {bg:GRAY, sz:8});
+    MG(6,16,8,20, '⑬\n청년등외\n상시근로자수\n(=③-⑫)', {bg:GRAY, sz:8});
 
     // ── 데이터 행 위치 계산 (참고 파일과 동일: 70행 고정) ────────────────
     const FIXED_ROWS = 70;                               // 고정 70행
@@ -1699,21 +1699,21 @@ async function downloadExcel() {
 
     // ── 명세 헤더 함수 ─────────────────────
     function writeSpecHeader(h1, h2) {
-      ws.getRow(h1).height = 50;
-      ws.getRow(h2).height = 50;
+      ws.getRow(h1).height = 58;
+      ws.getRow(h2).height = 58;
       [[1,'⑭\n생년월일\n(YYYYMMDD)'],[2,'⑮\n성명'],[3,'⑯\n상시\n근로자\n(N/Y)'],
        [4,'⑰\n상시근로자\n제외사유'],[5,'⑱\n단시간\n근로자유형\n(0.5/0.75)'],
        [6,'⑲\n내국인\n(N/Y)'],[7,'⑳\n수도권\n근무지\n(N/Y)'],
        [8,'㉑\n근로계약\n체결일\n(YYYYMMDD)'],[9,'㉒\n근로기간\n(MM-MM)'],
-       [10,'㉓\n상시근로자\n근무개월수'],[11,'㉔\n청년등\n근무개월수'],
-       [15,'㉑\n장애인\n(N/Y)'],[16,'㉑\n고령자\n(N/Y)'],
-       [17,'㉑\n경력단절\n근로자(N/Y)'],[18,'㉑\n북한이탈\n주민(N/Y)'],
-       [19,'㉑\n정규직\n전환자(N/Y)'],[20,'㉑\n육아휴직\n복귀자(N/Y)'],
-      ].forEach(function(x){ MG(h1,x[0],h2,x[0], x[1], {bg:GRAY}); });
+       [10,'㉓\n상시근로자\n근무\n개월수'],[11,'㉔\n청년등\n근무\n개월수'],
+       [15,'㉕\n장애인\n(N/Y)'],[16,'㉕\n고령자\n(N/Y)'],
+       [17,'㉕\n경력단절\n근로자\n(N/Y)'],[18,'㉕\n북한이탈\n주민\n(N/Y)'],
+       [19,'㉕\n정규직\n전환자\n(N/Y)'],[20,'㉕\n육아휴직\n복귀자\n(N/Y)'],
+      ].forEach(function(x){ MG(h1,x[0],h2,x[0], x[1], {bg:GRAY, sz:8}); });
       MG(h1,12,h1,14, '청년', {bg:BLUE, bold:true});
-      SC(h2,12, '㉕\n과세연도기준\n청년여부(N/Y)',      {bg:BLUE});
-      SC(h2,13, '㉖\n근로계약체결일기준\n청년여부(N/Y)', {bg:BLUE});
-      SC(h2,14, '㉗\n청년제외시점\n(YYYYMMDD)',          {bg:BLUE});
+      SC(h2,12, '㉕\n과세연도\n기준\n청년여부',      {bg:BLUE, sz:8});
+      SC(h2,13, '㉖\n계약체결일\n기준\n청년여부', {bg:BLUE, sz:8});
+      SC(h2,14, '㉗\n청년제외\n시점\n(YYYYMMDD)',          {bg:BLUE, sz:8});
     }
 
     // ── 데이터 행 작성 함수 ───────────────
