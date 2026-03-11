@@ -845,14 +845,19 @@ function calcWorkMonths(emp, taxYear) {
   let startMonth = workStart.getMonth() + 1; // 1-12
   let endMonth = workEnd.getMonth() + 1;
 
-  // 입사일이 과세연도 내이면 그 달부터, 퇴사일 있으면 그 달까지
-  // 입사일이 1일이 아니면 그 달은 다음 달부터 카운트 (단, 1일이면 해당 달 포함)
-  // 실무적으로: 입사월, 퇴사월 포함하여 월수 계산
+  // 퇴사월 처리: 퇴사일이 해당 월의 말일이 아니면 그 달 제외
+  // 예) 7월 25일 퇴사 → 7월은 미포함 (7월 31일까지 근무하지 않았으므로)
+  // 예) 7월 31일 퇴사 → 7월 포함
+  if (resignDate && resignDate < yearEnd) {
+    const lastDayOfMonth = new Date(resignDate.getFullYear(), resignDate.getMonth() + 1, 0).getDate();
+    if (resignDate.getDate() < lastDayOfMonth) {
+      endMonth = endMonth - 1;
+    }
+  }
+
   let months = endMonth - startMonth + 1;
   if (months < 0) months = 0;
 
-  // 퇴사월 처리: 퇴사일이 말일이 아니면 그 달 제외 (실무 관행)
-  // 초안 데이터 기준으로는 단순히 입사월~퇴사월(또는 12월) 포함
   return { months, startM: startMonth, endM: endMonth };
 }
 
