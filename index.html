@@ -977,9 +977,11 @@ function processEmployees(employees, taxYear, corpType) {
     }
 
     // 상시근로자인 경우에만 실제 개월수 반영
+    // regularMonths = 청년외 근무개월수 (총 근무개월 - 청년등 근무개월)
+    // youthMonths = 청년등 근무개월수
     if (regular) {
-      regularMonths = potentialRegularMonths;
       youthMonths = potentialYouthMonths;
+      regularMonths = potentialRegularMonths - potentialYouthMonths;
     }
 
     // 생년월일 from SSN
@@ -1026,8 +1028,8 @@ function truncHundredth(n) {
 function calcAgg(processed) {
   const months12 = 12;
 
-  // 총 근무개월수 합계
-  const totalMonths = processed.reduce((s,e) => s + e.regularMonths, 0);
+  // 총 근무개월수 합계 (regularMonths=청년외 + youthMonths=청년등)
+  const totalMonths = processed.reduce((s,e) => s + (e.regularMonths + e.youthMonths), 0);
 
   // ⑤ 청년 개월수: 상시근로자(Y) AND 청년(Y) AND 장애인등 특수 아닌 경우의 K열 합
   const youthTotalMonths = processed
@@ -1037,30 +1039,30 @@ function calcAgg(processed) {
       (e._regularConvert||'N') !== 'Y' && (e._childcareReturn||'N') !== 'Y')
     .reduce((s,e) => s + e.youthMonths, 0);
 
-  // ⑥ 장애인 개월수
+  // ⑥ 장애인 개월수 (전체 근무개월수 사용)
   const disabledMonths = processed
     .filter(e => e.regular === 'Y' && e.isDisabled === 'Y')
-    .reduce((s,e) => s + e.regularMonths, 0);
+    .reduce((s,e) => s + (e.regularMonths + e.youthMonths), 0);
 
-  // ⑦ 고령자 개월수
+  // ⑦ 고령자 개월수 (전체 근무개월수 사용)
   const elderlyMonths = processed
     .filter(e => e.regular === 'Y' && e.elderlyAtHire)
-    .reduce((s,e) => s + e.regularMonths, 0);
+    .reduce((s,e) => s + (e.regularMonths + e.youthMonths), 0);
 
-  // ⑧ 경력단절 개월수
+  // ⑧ 경력단절 개월수 (전체 근무개월수 사용)
   const careerMonths = processed
     .filter(e => e.regular === 'Y' && (e._career||'N') === 'Y')
-    .reduce((s,e) => s + e.regularMonths, 0);
+    .reduce((s,e) => s + (e.regularMonths + e.youthMonths), 0);
 
-  // ⑨ 북한이탈 개월수
+  // ⑨ 북한이탈 개월수 (전체 근무개월수 사용)
   const nkDefectorMonths = processed
     .filter(e => e.regular === 'Y' && (e._nkDefector||'N') === 'Y')
-    .reduce((s,e) => s + e.regularMonths, 0);
+    .reduce((s,e) => s + (e.regularMonths + e.youthMonths), 0);
 
-  // ③ 상시근로자수: 1인당 TRUNC(근무개월수/12,2) 합산
+  // ③ 상시근로자수: 1인당 TRUNC(전체근무개월수/12,2) 합산
   const workerCount = processed
     .filter(e => e.regular === 'Y')
-    .reduce((s, e) => s + truncHundredth(e.regularMonths / months12), 0);
+    .reduce((s, e) => s + truncHundredth((e.regularMonths + e.youthMonths) / months12), 0);
 
   // ⑫ 청년등 상시근로자수: 1인당 TRUNC(youthMonths/12,2) 합산
   const youthWorkerCount = processed
@@ -1102,8 +1104,8 @@ function calculate() {
       return {
         ...emp,
         regular: forced,
-        regularMonths: forced === 'Y' ? emp.potentialRegularMonths : 0,
         youthMonths:   forced === 'Y' ? emp.potentialYouthMonths   : 0,
+        regularMonths: forced === 'Y' ? (emp.potentialRegularMonths - emp.potentialYouthMonths) : 0,
         reason: forced === 'N' ? (emp.reason || '수동제외') : '',
         _override: forced,
         _autoRegular: emp.regular,
@@ -1118,8 +1120,8 @@ function calculate() {
       return {
         ...emp,
         regular: forced,
-        regularMonths: forced === 'Y' ? emp.potentialRegularMonths : 0,
         youthMonths:   forced === 'Y' ? emp.potentialYouthMonths   : 0,
+        regularMonths: forced === 'Y' ? (emp.potentialRegularMonths - emp.potentialYouthMonths) : 0,
         reason: forced === 'N' ? (emp.reason || '수동제외') : '',
         _override: forced,
         _autoRegular: emp.regular,
@@ -1171,20 +1173,22 @@ function calculate() {
         }
 
         // youthMonths 재계산 (엑셀 K열 수식 로직)
-        // 장애인/고령자/경력단절/북한이탈/정규직전환/육아휴직 중 하나라도 Y이면 → youthMonths = regularMonths
+        // 장애인/고령자/경력단절/북한이탈/정규직전환/육아휴직 중 하나라도 Y이면 → youthMonths = 전체개월수
+        // copy.regularMonths는 이 시점에서 potentialRegularMonths (전체 개월수)
+        const totalMonthsForCalc = copy.regularMonths;
         const hasSpecial = (copy.isDisabled === 'Y' || copy.elderlyAtHire === true ||
           (copy._career||'N') === 'Y' || (copy._nkDefector||'N') === 'Y' ||
           (copy._regularConvert||'N') === 'Y' || (copy._childcareReturn||'N') === 'Y');
 
         if (hasSpecial) {
-          copy.youthMonths = copy.regularMonths;
+          copy.youthMonths = totalMonthsForCalc;
         } else if (copy.isYouthHire !== 'Y') {
           // 청년(계약체결일 기준)이 아니면 0
           copy.youthMonths = 0;
         } else {
           // 청년인 경우: 청년제외시점 반영
           if (!copy.youthExclude) {
-            copy.youthMonths = copy.regularMonths;
+            copy.youthMonths = totalMonthsForCalc;
           } else {
             const excVal = parseInt(copy.youthExclude);
             const yearStart = yearForCalc * 10000 + 101;
@@ -1192,7 +1196,7 @@ function calculate() {
             if (excVal < yearStart) {
               copy.youthMonths = 0;
             } else if (excVal > yearEnd) {
-              copy.youthMonths = copy.regularMonths;
+              copy.youthMonths = totalMonthsForCalc;
             } else {
               // 제외시점이 과세연도 내: 제외월 전달까지
               const wp = copy.workPeriod || '';
@@ -1204,6 +1208,9 @@ function calculate() {
             }
           }
         }
+
+        // regularMonths = 청년외 근무개월수 (전체 - 청년등)
+        copy.regularMonths = totalMonthsForCalc - copy.youthMonths;
       }
 
       // 단시간근로자유형 적용: 0.5 또는 0.75 선택 시 근무개월수에 곱하기
@@ -1662,19 +1669,19 @@ async function downloadExcel() {
 
     // ── 집계 데이터행 (고정 70행 범위로 항상 수식) ──
     MG(9,1,9,2,   '해당과세연도', {bold:true});
-    FC(9,3,  'SUM(J'+CS+':J'+CE+')', '0');
-    FC(9,5,  'SUMPRODUCT(TRUNC(J'+CS+':J'+CE+'/12,2))', '0.00');
+    FC(9,3,  'SUM(J'+CS+':J'+CE+')+SUM(K'+CS+':K'+CE+')', '0');
+    FC(9,5,  'SUMPRODUCT(TRUNC((J'+CS+':J'+CE+'+K'+CS+':K'+CE+')/12,2))', '0.00');
     SC(9,4,  12);
     // ⑤청년 개월수
     FC(9,6, 'SUMPRODUCT((C'+CS+':C'+CE+'="Y")*(M'+CS+':M'+CE+'="Y")*(O'+CS+':O'+CE+'<>"Y")*(P'+CS+':P'+CE+'<>"Y")*(Q'+CS+':Q'+CE+'<>"Y")*(R'+CS+':R'+CE+'<>"Y")*(S'+CS+':S'+CE+'<>"Y")*(T'+CS+':T'+CE+'<>"Y")*K'+CS+':K'+CE+')', '0');
     // ⑥장애인 개월수
-    FC(9,7, 'SUMPRODUCT((C'+CS+':C'+CE+'="Y")*(O'+CS+':O'+CE+'="Y")*J'+CS+':J'+CE+')', '0');
+    FC(9,7, 'SUMPRODUCT((C'+CS+':C'+CE+'="Y")*(O'+CS+':O'+CE+'="Y")*(J'+CS+':J'+CE+'+K'+CS+':K'+CE+'))', '0');
     // ⑦고령자 개월수
-    FC(9,8, 'SUMPRODUCT((C'+CS+':C'+CE+'="Y")*(P'+CS+':P'+CE+'="Y")*J'+CS+':J'+CE+')', '0');
+    FC(9,8, 'SUMPRODUCT((C'+CS+':C'+CE+'="Y")*(P'+CS+':P'+CE+'="Y")*(J'+CS+':J'+CE+'+K'+CS+':K'+CE+'))', '0');
     // ⑧경력단절 개월수
-    FC(9,9, 'SUMPRODUCT((C'+CS+':C'+CE+'="Y")*(Q'+CS+':Q'+CE+'="Y")*J'+CS+':J'+CE+')', '0');
+    FC(9,9, 'SUMPRODUCT((C'+CS+':C'+CE+'="Y")*(Q'+CS+':Q'+CE+'="Y")*(J'+CS+':J'+CE+'+K'+CS+':K'+CE+'))', '0');
     // ⑨북한이탈 개월수
-    FC(9,10, 'SUMPRODUCT((C'+CS+':C'+CE+'="Y")*(R'+CS+':R'+CE+'="Y")*J'+CS+':J'+CE+')', '0');
+    FC(9,10, 'SUMPRODUCT((C'+CS+':C'+CE+'="Y")*(R'+CS+':R'+CE+'="Y")*(J'+CS+':J'+CE+'+K'+CS+':K'+CE+'))', '0');
     FC(9,11, 'SUM(F9:J9)', '0');
     SC(9,12, 12);
     // ⑫청년등 상시근로자수
@@ -1683,14 +1690,14 @@ async function downloadExcel() {
     FMG(9,16,20,  'E9-M9');
 
     MG(10,1,10,2, '직전과세연도', {bold:true});
-    FC(10,3,  'SUM(J'+PS+':J'+PE+')', '0');
-    FC(10,5,  'SUMPRODUCT(TRUNC(J'+PS+':J'+PE+'/12,2))', '0.00');
+    FC(10,3,  'SUM(J'+PS+':J'+PE+')+SUM(K'+PS+':K'+PE+')', '0');
+    FC(10,5,  'SUMPRODUCT(TRUNC((J'+PS+':J'+PE+'+K'+PS+':K'+PE+')/12,2))', '0.00');
     SC(10,4,  12);
     FC(10,6, 'SUMPRODUCT((C'+PS+':C'+PE+'="Y")*(M'+PS+':M'+PE+'="Y")*(O'+PS+':O'+PE+'<>"Y")*(P'+PS+':P'+PE+'<>"Y")*(Q'+PS+':Q'+PE+'<>"Y")*(R'+PS+':R'+PE+'<>"Y")*(S'+PS+':S'+PE+'<>"Y")*(T'+PS+':T'+PE+'<>"Y")*K'+PS+':K'+PE+')', '0');
-    FC(10,7, 'SUMPRODUCT((C'+PS+':C'+PE+'="Y")*(O'+PS+':O'+PE+'="Y")*J'+PS+':J'+PE+')', '0');
-    FC(10,8, 'SUMPRODUCT((C'+PS+':C'+PE+'="Y")*(P'+PS+':P'+PE+'="Y")*J'+PS+':J'+PE+')', '0');
-    FC(10,9, 'SUMPRODUCT((C'+PS+':C'+PE+'="Y")*(Q'+PS+':Q'+PE+'="Y")*J'+PS+':J'+PE+')', '0');
-    FC(10,10, 'SUMPRODUCT((C'+PS+':C'+PE+'="Y")*(R'+PS+':R'+PE+'="Y")*J'+PS+':J'+PE+')', '0');
+    FC(10,7, 'SUMPRODUCT((C'+PS+':C'+PE+'="Y")*(O'+PS+':O'+PE+'="Y")*(J'+PS+':J'+PE+'+K'+PS+':K'+PE+'))', '0');
+    FC(10,8, 'SUMPRODUCT((C'+PS+':C'+PE+'="Y")*(P'+PS+':P'+PE+'="Y")*(J'+PS+':J'+PE+'+K'+PS+':K'+PE+'))', '0');
+    FC(10,9, 'SUMPRODUCT((C'+PS+':C'+PE+'="Y")*(Q'+PS+':Q'+PE+'="Y")*(J'+PS+':J'+PE+'+K'+PS+':K'+PE+'))', '0');
+    FC(10,10, 'SUMPRODUCT((C'+PS+':C'+PE+'="Y")*(R'+PS+':R'+PE+'="Y")*(J'+PS+':J'+PE+'+K'+PS+':K'+PE+'))', '0');
     FC(10,11, 'SUM(F10:J10)', '0');
     SC(10,12, 12);
     FC(10,13, 'SUMPRODUCT(TRUNC(K'+PS+':K'+PE+'/12,2))', '0.00');
@@ -1778,22 +1785,18 @@ async function downloadExcel() {
           }
         });
 
-        // Col J (10): ㉓상시근로자 근무개월수 — formula (단시간근로자유형 반영)
-        FC(r, 10,
-          'IF(C'+r+'="Y",FLOOR((VALUE(RIGHT(I'+r+',2))-VALUE(LEFT(I'+r+',2))+1)*IF(E'+r+'="",1,VALUE(E'+r+')),0.01),0)',
-          '0');
-        var cellJ = ws.getCell(r, 10);
-        cellJ.fill = {type:'pattern', pattern:'solid', fgColor:{argb:bg}};
+        // 전체 근무개월수 수식 (J+K 계산 기반) — K에서 인라인 사용
+        var totalF = 'IF(C'+r+'="Y",FLOOR((VALUE(RIGHT(I'+r+',2))-VALUE(LEFT(I'+r+',2))+1)*IF(E'+r+'="",1,VALUE(E'+r+')),0.01),0)';
 
-        // Col K (11): ㉔청년등 근무개월수 — formula
+        // Col K (11): ㉔청년등 근무개월수 — formula (전체 근무개월수를 인라인 참조)
         FC(r, 11,
           'IF(C'+r+'<>"Y",0,' +
-            'IF(OR(O'+r+'="Y",P'+r+'="Y",Q'+r+'="Y",R'+r+'="Y",S'+r+'="Y",T'+r+'="Y"),J'+r+',' +
+            'IF(OR(O'+r+'="Y",P'+r+'="Y",Q'+r+'="Y",R'+r+'="Y",S'+r+'="Y",T'+r+'="Y"),'+totalF+',' +
               'IF(M'+r+'<>"Y",0,' +
-                'IF(N'+r+'="",J'+r+',' +
+                'IF(N'+r+'="",'+totalF+',' +
                   'IF(IFERROR(VALUE(N'+r+'),0)<'+yearStart+',0,' +
-                    'IF(VALUE(N'+r+')>'+yearEnd+',J'+r+',' +
-                      'MAX(0,MIN(VALUE(RIGHT(I'+r+',2)),VALUE(MID(N'+r+',5,2))-1)-VALUE(LEFT(I'+r+',2))+1)' +
+                    'IF(VALUE(N'+r+')>'+yearEnd+','+totalF+',' +
+                      'FLOOR(MAX(0,MIN(VALUE(RIGHT(I'+r+',2)),VALUE(MID(N'+r+',5,2))-1)-VALUE(LEFT(I'+r+',2))+1)*IF(E'+r+'="",1,VALUE(E'+r+')),0.01)' +
                     ')' +
                   ')' +
                 ')' +
@@ -1803,6 +1806,13 @@ async function downloadExcel() {
           '0');
         var cellK = ws.getCell(r, 11);
         cellK.fill = {type:'pattern', pattern:'solid', fgColor:{argb:bg}};
+
+        // Col J (10): ㉓상시근로자(청년외) 근무개월수 = 전체 - 청년등
+        FC(r, 10,
+          totalF+'-K'+r,
+          '0');
+        var cellJ = ws.getCell(r, 10);
+        cellJ.fill = {type:'pattern', pattern:'solid', fgColor:{argb:bg}};
       });
 
       // ── 빈 행 (데이터 이후 ~ 70행까지) — 수식·드롭다운·서식 채우기 ──
@@ -1824,25 +1834,27 @@ async function downloadExcel() {
             cell.dataValidation = shortTimeValidation;
           }
         }
-        // Col J (10): 수식 — 빈 행이므로 C=빈칸이면 0 (단시간근로자유형 반영)
-        FC(r, 10,
-          'IF(C'+r+'="Y",FLOOR((VALUE(RIGHT(I'+r+',2))-VALUE(LEFT(I'+r+',2))+1)*IF(E'+r+'="",1,VALUE(E'+r+')),0.01),0)',
-          '0');
-        // Col K (11): 수식
+        // 전체 근무개월수 수식 (J+K 계산 기반) — K에서 인라인 사용
+        var totalF = 'IF(C'+r+'="Y",FLOOR((VALUE(RIGHT(I'+r+',2))-VALUE(LEFT(I'+r+',2))+1)*IF(E'+r+'="",1,VALUE(E'+r+')),0.01),0)';
+        // Col K (11): ㉔청년등 근무개월수 — formula (전체 근무개월수를 인라인 참조)
         FC(r, 11,
           'IF(C'+r+'<>"Y",0,' +
-            'IF(OR(O'+r+'="Y",P'+r+'="Y",Q'+r+'="Y",R'+r+'="Y",S'+r+'="Y",T'+r+'="Y"),J'+r+',' +
+            'IF(OR(O'+r+'="Y",P'+r+'="Y",Q'+r+'="Y",R'+r+'="Y",S'+r+'="Y",T'+r+'="Y"),'+totalF+',' +
               'IF(M'+r+'<>"Y",0,' +
-                'IF(N'+r+'="",J'+r+',' +
+                'IF(N'+r+'="",'+totalF+',' +
                   'IF(IFERROR(VALUE(N'+r+'),0)<'+yearStart+',0,' +
-                    'IF(VALUE(N'+r+')>'+yearEnd+',J'+r+',' +
-                      'MAX(0,MIN(VALUE(RIGHT(I'+r+',2)),VALUE(MID(N'+r+',5,2))-1)-VALUE(LEFT(I'+r+',2))+1)' +
+                    'IF(VALUE(N'+r+')>'+yearEnd+','+totalF+',' +
+                      'FLOOR(MAX(0,MIN(VALUE(RIGHT(I'+r+',2)),VALUE(MID(N'+r+',5,2))-1)-VALUE(LEFT(I'+r+',2))+1)*IF(E'+r+'="",1,VALUE(E'+r+')),0.01)' +
                     ')' +
                   ')' +
                 ')' +
               ')' +
             ')' +
           ')',
+          '0');
+        // Col J (10): ㉓상시근로자(청년외) 근무개월수 = 전체 - 청년등
+        FC(r, 10,
+          totalF+'-K'+r,
           '0');
       }
     }
