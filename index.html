@@ -544,6 +544,9 @@ let overrides = {};
 // Y/N 셀 수동 편집: { 'cur:사원코드:필드명': 'Y'|'N' }
 let ynEdits = {};
 
+// 단시간근로자유형 편집: { 'cur:사원코드': '0.5'|'0.75'|'' }
+let shortTimeEdits = {};
+
 // 수도권 부서·임원 직급 — 파일 업로드 시 자동 감지 후 덮어씀
 // 사용자가 체크박스를 바꾸면 그 상태가 유지됨
 let metroDepts = new Set();
@@ -842,14 +845,19 @@ function calcWorkMonths(emp, taxYear) {
   let startMonth = workStart.getMonth() + 1; // 1-12
   let endMonth = workEnd.getMonth() + 1;
 
-  // 입사일이 과세연도 내이면 그 달부터, 퇴사일 있으면 그 달까지
-  // 입사일이 1일이 아니면 그 달은 다음 달부터 카운트 (단, 1일이면 해당 달 포함)
-  // 실무적으로: 입사월, 퇴사월 포함하여 월수 계산
+  // 퇴사월 처리: 퇴사일이 해당 월의 말일이 아니면 그 달 제외
+  // 예) 7월 25일 퇴사 → 7월은 미포함 (7월 31일까지 근무하지 않았으므로)
+  // 예) 7월 31일 퇴사 → 7월 포함
+  if (resignDate && resignDate < yearEnd) {
+    const lastDayOfMonth = new Date(resignDate.getFullYear(), resignDate.getMonth() + 1, 0).getDate();
+    if (resignDate.getDate() < lastDayOfMonth) {
+      endMonth = endMonth - 1;
+    }
+  }
+
   let months = endMonth - startMonth + 1;
   if (months < 0) months = 0;
 
-  // 퇴사월 처리: 퇴사일이 말일이 아니면 그 달 제외 (실무 관행)
-  // 초안 데이터 기준으로는 단순히 입사월~퇴사월(또는 12월) 포함
   return { months, startM: startMonth, endM: endMonth };
 }
 
@@ -1156,6 +1164,9 @@ function calculate() {
         } else {
           copy.regularMonths = 0;
           copy.youthMonths = 0;
+          // 단시간근로자유형 적용 (제외자도 shortTimeType 저장)
+          const stKey = setKey + ':' + emp.code;
+          copy.shortTimeType = shortTimeEdits[stKey] || '';
           return copy;
         }
 
@@ -1193,6 +1204,16 @@ function calculate() {
             }
           }
         }
+      }
+
+      // 단시간근로자유형 적용: 0.5 또는 0.75 선택 시 근무개월수에 곱하기
+      const stKey = setKey + ':' + emp.code;
+      const stType = shortTimeEdits[stKey] || '';
+      copy.shortTimeType = stType;
+      if (stType) {
+        const multiplier = parseFloat(stType);
+        copy.regularMonths = Math.floor(copy.regularMonths * multiplier * 100) / 100;
+        copy.youthMonths = Math.floor(copy.youthMonths * multiplier * 100) / 100;
       }
 
       return copy;
@@ -1250,6 +1271,17 @@ function toggleYN(setKey, empCode, field) {
     ynEdits[key] = (cell && cell.textContent === 'Y') ? 'N' : 'Y';
   } else {
     ynEdits[key] = current === 'Y' ? 'N' : 'Y';
+  }
+  calculate();
+}
+
+// 단시간근로자유형 변경 (셀렉트 박스에서 호출)
+function changeShortTimeType(setKey, empCode, value) {
+  const key = setKey + ':' + empCode;
+  if (value === '') {
+    delete shortTimeEdits[key];
+  } else {
+    shortTimeEdits[key] = value;
   }
   calculate();
 }
@@ -1352,6 +1384,18 @@ function renderDetailTable(processed, setKey) {
     return `<td class="yn-toggle ${cls}" id="${id}" title="클릭하여 Y↔N 전환" onclick="toggleYN('${setKey}','${empCode}','${field}')">${v}</td>`;
   };
 
+  // 단시간근로자유형 셀렉트 박스 생성 헬퍼
+  const shortTimeSelect = (empCode) => {
+    const key = setKey + ':' + empCode;
+    const cur = shortTimeEdits[key] || '';
+    return `<select style="font-size:11px;padding:1px 2px;border:1px solid #ccc;border-radius:3px;background:#fff;cursor:pointer;"
+      onchange="changeShortTimeType('${setKey}','${empCode}',this.value)">
+      <option value=""${cur === '' ? ' selected' : ''}></option>
+      <option value="0.5"${cur === '0.5' ? ' selected' : ''}>0.5</option>
+      <option value="0.75"${cur === '0.75' ? ' selected' : ''}>0.75</option>
+    </select>`;
+  };
+
   const rows = processed.map(emp => {
     const isOverride  = emp._override !== undefined;
     const autoRegular = emp._autoRegular || emp.regular;
@@ -1411,13 +1455,13 @@ function renderDetailTable(processed, setKey) {
       <td class="name-col">${emp.name}${isOverride ? ' <span style="font-size:9px;opacity:.6">(수동)</span>' : ''}</td>
       ${ynCell(emp.regular, ec, 'regular')}
       <td class="reason">${emp.reason || ''}</td>
-      <td></td>
+      <td>${shortTimeSelect(ec)}</td>
       ${ynCell(emp.domestic, ec, 'domestic')}
       ${ynCell(emp.metro, ec, 'metro')}
       <td class="months">${emp.hireStr}</td>
       <td>${emp.workPeriod}</td>
-      <td class="months">${emp.regularMonths || 0}</td>
-      <td class="months">${emp.youthMonths || 0}</td>
+      <td class="months">${emp.regularMonths % 1 === 0 ? (emp.regularMonths || 0) : emp.regularMonths}</td>
+      <td class="months">${emp.youthMonths % 1 === 0 ? (emp.youthMonths || 0) : emp.youthMonths}</td>
       ${ynCell(emp.isYouthYear, ec, 'isYouthYear')}
       ${ynCell(emp.isYouthHire, ec, 'isYouthHire')}
       <td class="months">${emp.youthExclude || ''}</td>
@@ -1689,6 +1733,17 @@ async function downloadExcel() {
         promptTitle: '선택',
         prompt: 'Y 또는 N을 선택하세요'
       };
+      var shortTimeValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['"0.5,0.75"'],
+        showErrorMessage: true,
+        errorTitle: '입력 오류',
+        error: '0.5 또는 0.75만 입력할 수 있습니다.',
+        showInputMessage: true,
+        promptTitle: '단시간근로자유형',
+        prompt: '0.5 또는 0.75를 선택하세요'
+      };
 
       // ── 실제 데이터 행 ──
       employees.forEach(function(emp, idx) {
@@ -1698,7 +1753,7 @@ async function downloadExcel() {
         var isYouth  = !excluded && emp.isYouthHire === 'Y';
         var bg = excluded ? EXCL : (isYouth ? YOUTH : WHITE);
         var vals = [
-          emp.birthStr||'', emp.name, emp.regular, emp.reason||'', '',
+          emp.birthStr||'', emp.name, emp.regular, emp.reason||'', emp.shortTimeType||'',
           emp.domestic, emp.metro, emp.hireStr||'', emp.workPeriod||'',
           null, null,
           emp.isYouthYear, emp.isYouthHire, emp.youthExclude||'',
@@ -1717,11 +1772,15 @@ async function downloadExcel() {
           if (ynCols.indexOf(c) >= 0) {
             ws.getCell(r, c).dataValidation = ynValidation;
           }
+          // 단시간근로자유형 컬럼에 드롭다운 추가
+          if (c === 5) {
+            ws.getCell(r, c).dataValidation = shortTimeValidation;
+          }
         });
 
-        // Col J (10): ㉓상시근로자 근무개월수 — formula
+        // Col J (10): ㉓상시근로자 근무개월수 — formula (단시간근로자유형 반영)
         FC(r, 10,
-          'IF(C'+r+'="Y",VALUE(RIGHT(I'+r+',2))-VALUE(LEFT(I'+r+',2))+1,0)',
+          'IF(C'+r+'="Y",FLOOR((VALUE(RIGHT(I'+r+',2))-VALUE(LEFT(I'+r+',2))+1)*IF(E'+r+'="",1,VALUE(E'+r+')),0.01),0)',
           '0');
         var cellJ = ws.getCell(r, 10);
         cellJ.fill = {type:'pattern', pattern:'solid', fgColor:{argb:bg}};
@@ -1760,10 +1819,14 @@ async function downloadExcel() {
           if (ynCols.indexOf(c) >= 0) {
             cell.dataValidation = ynValidation;
           }
+          // 단시간근로자유형 컬럼에 드롭다운
+          if (c === 5) {
+            cell.dataValidation = shortTimeValidation;
+          }
         }
-        // Col J (10): 수식 — 빈 행이므로 C=빈칸이면 0
+        // Col J (10): 수식 — 빈 행이므로 C=빈칸이면 0 (단시간근로자유형 반영)
         FC(r, 10,
-          'IF(C'+r+'="Y",VALUE(RIGHT(I'+r+',2))-VALUE(LEFT(I'+r+',2))+1,0)',
+          'IF(C'+r+'="Y",FLOOR((VALUE(RIGHT(I'+r+',2))-VALUE(LEFT(I'+r+',2))+1)*IF(E'+r+'="",1,VALUE(E'+r+')),0.01),0)',
           '0');
         // Col K (11): 수식
         FC(r, 11,
