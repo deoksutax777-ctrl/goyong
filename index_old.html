@@ -1363,7 +1363,7 @@ function renderDetailTable(processed, setKey) {
     const isOverride  = emp._override !== undefined;
     const autoRegular = emp._autoRegular || emp.regular;
     const excluded    = emp.regular === 'N';
-    const isYouth     = !excluded && (emp.isYouthHire === 'Y');
+    const isYouth     = !excluded && (emp.isYouthYear === 'Y');
 
     // 행 클래스
     let rowClass = '';
