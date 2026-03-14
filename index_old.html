@@ -955,7 +955,10 @@ function processEmployees(employees, taxYear, corpType) {
       birthStr = `${birthDate.getFullYear()}${String(birthDate.getMonth()+1).padStart(2,'0')}${String(birthDate.getDate()).padStart(2,'0')}`;
     }
 
-    const workPeriod = months > 0 ? `${String(startM).padStart(2,'0')}~${String(endM).padStart(2,'0')}` : '';
+    // 해당 과세연도에 근무 이력이 있으면 workPeriod 표시 (months=0이라도 표시)
+    // 예) 1월 중도퇴사 → startM=1, endM=0, months=0 → "01~00" (엑셀 수식: 00-01+1=0)
+    const hasWorkRecord = startM > 0;
+    const workPeriod = hasWorkRecord ? `${String(startM).padStart(2,'0')}~${String(endM).padStart(2,'0')}` : '';
 
     return {
       ...emp,
