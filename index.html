@@ -880,19 +880,20 @@ function isYouthAtHire(birthDate, hireDate) {
 
 // 【2026.2.27 개정 시행령 반영】
 // 청년 제외시점 계산:
-//   입사일 기준 34세 이하 → 근로계약체결일부터 4년(중소·중견) 또는 3년(대기업)간 청년 유지
-//   단, 만 35세 생일 이전에 4년이 끝나면 만 35세 생일까지는 어차피 34세 이하이므로
-//   실질적으로 제외시점 = max(만35세생일, 입사일+유지기간) 이 아니라
-//   제외시점 = min(만35세생일, 입사일+유지기간) 도 아닌,
-//   "입사일 기준 청년이면 입사일+4년까지 청년 유지" 이므로
-//   제외시점 = 입사일 + 4년 (이 날부터 청년 아님)
-//   (만 35세 생일이 입사일+4년보다 빠르더라도 4년간 유지)
+//   아래 둘 중 늦은 날부터 청년이 아닌 것으로 봄
+//   1) 실제 청년이 아니게 되는 날 = 만 35세 생일
+//   2) 근로계약체결일 + 4년(중소·중견) 또는 3년(대기업)
+//   제외시점 = max(만35세생일, 입사일+유지기간)
 function calcYouthExclude(birthDate, hireDate, corpType) {
   if (!birthDate || !hireDate) return null;
   // 유지기간: 중소·중견 = 4년, 대기업 = 3년
   const keepYears = (corpType === '대기업') ? 3 : 4;
   const hireExclude = new Date(hireDate.getFullYear() + keepYears, hireDate.getMonth(), hireDate.getDate());
-  return formatDate(hireExclude);
+  // 만 35세 생일 (청년이 아니게 되는 날)
+  const age35Date = new Date(birthDate.getFullYear() + 35, birthDate.getMonth(), birthDate.getDate());
+  // 둘 중 늦은 날
+  const excludeDate = hireExclude > age35Date ? hireExclude : age35Date;
+  return formatDate(excludeDate);
 }
 
 // 고령자: 근로계약체결일 현재 60세 이상
@@ -935,13 +936,20 @@ function processEmployees(employees, taxYear, corpType) {
 
     if (birthDate) {
       isYouthYear = isYouthAtYear(birthDate, taxYear);
-      isYouthHire = hireDate ? isYouthAtHire(birthDate, hireDate) : false;
       isDisabled = emp.disabled > 0;
       elderlyAtHire = hireDate ? isElderlyAtHire(birthDate, hireDate) : false;
       isElderly = isElderlyAtYear(birthDate, taxYear);
 
-      if (isYouthHire) {
-        youthExclude = calcYouthExclude(birthDate, hireDate, corpType);
+      // 2024년 이전 근로계약 체결자: 근로계약체결일 기준 청년여부 미적용
+      // → 과세연도 말일(12.31) 기준 나이로 청년 판정, 유지기간(제외시점) 없음
+      const isPreAmendContract = hireDate && hireDate < new Date(2024, 0, 1);
+      if (isPreAmendContract) {
+        isYouthHire = isYouthYear;
+      } else {
+        isYouthHire = hireDate ? isYouthAtHire(birthDate, hireDate) : false;
+        if (isYouthHire) {
+          youthExclude = calcYouthExclude(birthDate, hireDate, corpType);
+        }
       }
     }
 
@@ -1772,6 +1780,7 @@ async function downloadExcel() {
         vals.forEach(function(v, ci) {
           var c = ci + 1;
           if (c === 10 || c === 11) return; // skip — will be formulas
+          if (c === 14) return; // skip — 청년제외시점은 수식으로 처리
           var color = null;
           if (v === 'Y') color = 'FF0E7C61';
           if (v === 'N' && ynCols.indexOf(c)>=0) color = 'FFCCCCCC';
@@ -1815,6 +1824,22 @@ async function downloadExcel() {
           '0');
         var cellJ = ws.getCell(r, 10);
         cellJ.fill = {type:'pattern', pattern:'solid', fgColor:{argb:bg}};
+
+        // Col N (14): ㉗청년제외시점 — 수식
+        // = M열이 "Y"이고 A열·H열이 비어있지 않으면:
+        //   유지기간 = $N$3(기업유형)이 "대기업"이면 3, 아니면 4
+        //   만35세생일 = (생년월일 왼쪽4자리+35) & 생년월일 오른쪽4자리
+        //   입사+유지  = (근로계약체결일 왼쪽4자리+유지기간) & 근로계약체결일 오른쪽4자리
+        //   제외시점   = MAX(만35세생일, 입사+유지)
+        var youthExclFormula =
+          'IF(OR(M'+r+'<>"Y",A'+r+'="",H'+r+'=""),"",' +
+            'TEXT(MAX(' +
+              '(LEFT(A'+r+',4)+35)*10000+VALUE(RIGHT(A'+r+',4)),' +
+              '(LEFT(H'+r+',4)+IF($N$3="대기업",3,4))*10000+VALUE(RIGHT(H'+r+',4))' +
+            '),"00000000"))';
+        FC(r, 14, youthExclFormula);
+        var cellN = ws.getCell(r, 14);
+        cellN.fill = {type:'pattern', pattern:'solid', fgColor:{argb:bg}};
       });
 
       // ── 빈 행 (데이터 이후 ~ 70행까지) — 수식·드롭다운·서식 채우기 ──
@@ -1858,6 +1883,14 @@ async function downloadExcel() {
         FC(r, 10,
           totalF+'-K'+r,
           '0');
+        // Col N (14): ㉗청년제외시점 — 수식 (빈 행)
+        var youthExclFormula =
+          'IF(OR(M'+r+'<>"Y",A'+r+'="",H'+r+'=""),"",' +
+            'TEXT(MAX(' +
+              '(LEFT(A'+r+',4)+35)*10000+VALUE(RIGHT(A'+r+',4)),' +
+              '(LEFT(H'+r+',4)+IF($N$3="대기업",3,4))*10000+VALUE(RIGHT(H'+r+',4))' +
+            '),"00000000"))';
+        FC(r, 14, youthExclFormula);
       }
     }
 
