@@ -1780,6 +1780,7 @@ async function downloadExcel() {
         vals.forEach(function(v, ci) {
           var c = ci + 1;
           if (c === 10 || c === 11) return; // skip — will be formulas
+          if (c === 14) return; // skip — 청년제외시점은 수식으로 처리
           var color = null;
           if (v === 'Y') color = 'FF0E7C61';
           if (v === 'N' && ynCols.indexOf(c)>=0) color = 'FFCCCCCC';
@@ -1823,6 +1824,22 @@ async function downloadExcel() {
           '0');
         var cellJ = ws.getCell(r, 10);
         cellJ.fill = {type:'pattern', pattern:'solid', fgColor:{argb:bg}};
+
+        // Col N (14): ㉗청년제외시점 — 수식
+        // = M열이 "Y"이고 A열·H열이 비어있지 않으면:
+        //   유지기간 = $N$3(기업유형)이 "대기업"이면 3, 아니면 4
+        //   만35세생일 = (생년월일 왼쪽4자리+35) & 생년월일 오른쪽4자리
+        //   입사+유지  = (근로계약체결일 왼쪽4자리+유지기간) & 근로계약체결일 오른쪽4자리
+        //   제외시점   = MAX(만35세생일, 입사+유지)
+        var youthExclFormula =
+          'IF(OR(M'+r+'<>"Y",A'+r+'="",H'+r+'=""),"",' +
+            'TEXT(MAX(' +
+              '(LEFT(A'+r+',4)+35)*10000+VALUE(RIGHT(A'+r+',4)),' +
+              '(LEFT(H'+r+',4)+IF($N$3="대기업",3,4))*10000+VALUE(RIGHT(H'+r+',4))' +
+            '),"00000000"))';
+        FC(r, 14, youthExclFormula);
+        var cellN = ws.getCell(r, 14);
+        cellN.fill = {type:'pattern', pattern:'solid', fgColor:{argb:bg}};
       });
 
       // ── 빈 행 (데이터 이후 ~ 70행까지) — 수식·드롭다운·서식 채우기 ──
@@ -1866,6 +1883,14 @@ async function downloadExcel() {
         FC(r, 10,
           totalF+'-K'+r,
           '0');
+        // Col N (14): ㉗청년제외시점 — 수식 (빈 행)
+        var youthExclFormula =
+          'IF(OR(M'+r+'<>"Y",A'+r+'="",H'+r+'=""),"",' +
+            'TEXT(MAX(' +
+              '(LEFT(A'+r+',4)+35)*10000+VALUE(RIGHT(A'+r+',4)),' +
+              '(LEFT(H'+r+',4)+IF($N$3="대기업",3,4))*10000+VALUE(RIGHT(H'+r+',4))' +
+            '),"00000000"))';
+        FC(r, 14, youthExclFormula);
       }
     }
 
