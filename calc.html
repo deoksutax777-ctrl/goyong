@@ -73,7 +73,7 @@
     outline: none; border-color: var(--accent);
     box-shadow: 0 0 0 2px rgba(26,79,168,.1);
   }
-  input[type=number] { width: 110px; text-align: right; font-family: var(--mono); }
+  input[type=number] { width: 100px; text-align: right; font-family: var(--mono); }
 
   .calc-table {
     width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px;
@@ -107,14 +107,14 @@
     border-radius: 8px; padding: 16px; margin-top: 12px;
   }
   .result-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;
   }
   .result-card {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: 7px; padding: 12px 16px; text-align: center;
   }
   .result-card .rc-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
-  .result-card .rc-val { font-size: 20px; font-weight: 700; font-family: var(--mono); }
+  .result-card .rc-val { font-size: 18px; font-weight: 700; font-family: var(--mono); }
   .result-card .rc-sub { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
   .result-card.blue { border-color: var(--accent); }
   .result-card.blue .rc-val { color: var(--accent); }
@@ -134,16 +134,15 @@
   .formula-box .formula-title {
     font-weight: 700; color: var(--accent); margin-bottom: 4px; font-size: 11px;
   }
+  .formula-box .formula-title.green { color: var(--accent2); }
   .formula-box code {
     font-family: var(--mono); background: #e8eef8; padding: 1px 5px;
     border-radius: 3px; font-size: 11px;
   }
 
-  .section-divider {
-    border: none; border-top: 2px dashed var(--border); margin: 24px 0;
-  }
-
   .total-panel .panel-header { background: var(--accent); color: #fff; }
+  .old23-panel .panel-header { background: #2d6a4f; color: #fff; }
+  .old24-panel .panel-header { background: #7b2d8b; color: #fff; }
 
   @media print {
     .app-header, .no-print { display: none !important; }
@@ -181,185 +180,87 @@
             <option value="대기업">대기업</option>
           </select>
         </div>
-        <div class="field-group">
-          <label>현행 당기 과세연도</label>
-          <select id="cur-year" onchange="recalcAll()">
-            <option value="2025" selected>2025년</option>
-            <option value="2024">2024년</option>
-          </select>
-        </div>
-        <div class="field-group">
-          <label>구버전 당기 과세연도</label>
-          <select id="old-year" onchange="recalcAll()">
-            <option value="2024">2024년</option>
-            <option value="2023" selected>2023년</option>
-          </select>
-        </div>
       </div>
     </div>
   </div>
 
-  <!-- ── 현행 (개정 후) ──────────────── -->
+  <!-- ── 상시근로자수 입력 ──────────────── -->
   <div class="panel">
-    <div class="panel-header"><span class="icon">📊</span> 현행 (개정 후) — <span id="cur-year-label">2025</span>년 당기</div>
+    <div class="panel-header"><span class="icon">📋</span> 상시근로자수 입력 (연도별)</div>
     <div class="panel-body">
-      <p style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">명세서에서 산출된 상시근로자 수를 입력하세요. 증가분 × 단가로 공제액이 계산됩니다.</p>
-      <table class="calc-table" id="cur-table">
+      <p style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">
+        각 연도의 상시근로자수를 입력하면 모든 공제액이 자동 계산됩니다.
+      </p>
+      <table class="calc-table" id="input-table">
         <thead>
           <tr>
-            <th rowspan="2" style="width:160px;">구 분</th>
-            <th colspan="3" class="youth-hdr">청년등</th>
-            <th colspan="3" class="normal-hdr" id="cur-normal-hdr">청년등외</th>
+            <th rowspan="2" style="width:130px;">연도</th>
+            <th colspan="2" class="youth-hdr">청년등</th>
+            <th colspan="2" class="normal-hdr" id="input-normal-hdr">청년등외</th>
           </tr>
           <tr>
-            <th>당기</th><th>전기</th><th>증가분</th>
-            <th id="cur-nh1">당기</th><th id="cur-nh2">전기</th><th id="cur-nh3">증가분</th>
+            <th class="youth-hdr">수도권</th>
+            <th class="youth-hdr" id="input-yl-hdr">비수도권</th>
+            <th class="normal-hdr" id="input-nm-hdr">수도권</th>
+            <th class="normal-hdr" id="input-nl-hdr">비수도권</th>
           </tr>
         </thead>
         <tbody>
-          <tr id="cur-metro-row">
-            <td class="label-cell">수도권</td>
-            <td><input type="number" id="cur-youth-metro-cur" step="0.01" value="0" oninput="recalcCur()"></td>
-            <td><input type="number" id="cur-youth-metro-prev" step="0.01" value="0" oninput="recalcCur()"></td>
-            <td class="result" id="cur-youth-metro-diff">0</td>
-            <td><input type="number" id="cur-normal-metro-cur" step="0.01" value="0" oninput="recalcCur()"></td>
-            <td><input type="number" id="cur-normal-metro-prev" step="0.01" value="0" oninput="recalcCur()"></td>
-            <td class="result" id="cur-normal-metro-diff">0</td>
+          <tr id="row-22">
+            <td class="label-cell">2022년 (구버전 23년의 전기)</td>
+            <td><input type="number" id="w22-youth-metro" step="0.01" value="0" oninput="recalcAll()"></td>
+            <td id="td-w22-yl"><input type="number" id="w22-youth-local" step="0.01" value="0" oninput="recalcAll()"></td>
+            <td id="td-w22-nm"><input type="number" id="w22-normal-metro" step="0.01" value="0" oninput="recalcAll()"></td>
+            <td id="td-w22-nl"><input type="number" id="w22-normal-local" step="0.01" value="0" oninput="recalcAll()"></td>
           </tr>
-          <tr id="cur-local-row">
-            <td class="label-cell">비수도권 (지방)</td>
-            <td><input type="number" id="cur-youth-local-cur" step="0.01" value="0" oninput="recalcCur()"></td>
-            <td><input type="number" id="cur-youth-local-prev" step="0.01" value="0" oninput="recalcCur()"></td>
-            <td class="result" id="cur-youth-local-diff">0</td>
-            <td><input type="number" id="cur-normal-local-cur" step="0.01" value="0" oninput="recalcCur()"></td>
-            <td><input type="number" id="cur-normal-local-prev" step="0.01" value="0" oninput="recalcCur()"></td>
-            <td class="result" id="cur-normal-local-diff">0</td>
+          <tr id="row-23">
+            <td class="label-cell">2023년 (구버전 23년 당기)</td>
+            <td><input type="number" id="w23-youth-metro" step="0.01" value="0" oninput="recalcAll()"></td>
+            <td id="td-w23-yl"><input type="number" id="w23-youth-local" step="0.01" value="0" oninput="recalcAll()"></td>
+            <td id="td-w23-nm"><input type="number" id="w23-normal-metro" step="0.01" value="0" oninput="recalcAll()"></td>
+            <td id="td-w23-nl"><input type="number" id="w23-normal-local" step="0.01" value="0" oninput="recalcAll()"></td>
           </tr>
-          <tr class="total-row">
-            <td class="label-cell">합 계</td>
-            <td id="cur-youth-total-cur">0</td>
-            <td id="cur-youth-total-prev">0</td>
-            <td id="cur-youth-total-diff">0</td>
-            <td id="cur-normal-total-cur">0</td>
-            <td id="cur-normal-total-prev">0</td>
-            <td id="cur-normal-total-diff">0</td>
+          <tr id="row-24">
+            <td class="label-cell">2024년 (구버전 24년 당기)</td>
+            <td><input type="number" id="w24-youth-metro" step="0.01" value="0" oninput="recalcAll()"></td>
+            <td id="td-w24-yl"><input type="number" id="w24-youth-local" step="0.01" value="0" oninput="recalcAll()"></td>
+            <td id="td-w24-nm"><input type="number" id="w24-normal-metro" step="0.01" value="0" oninput="recalcAll()"></td>
+            <td id="td-w24-nl"><input type="number" id="w24-normal-local" step="0.01" value="0" oninput="recalcAll()"></td>
+          </tr>
+          <tr id="row-25">
+            <td class="label-cell">2025년 (개정 25년 당기)</td>
+            <td><input type="number" id="w25-youth-metro" step="0.01" value="0" oninput="recalcAll()"></td>
+            <td id="td-w25-yl"><input type="number" id="w25-youth-local" step="0.01" value="0" oninput="recalcAll()"></td>
+            <td id="td-w25-nm"><input type="number" id="w25-normal-metro" step="0.01" value="0" oninput="recalcAll()"></td>
+            <td id="td-w25-nl"><input type="number" id="w25-normal-local" step="0.01" value="0" oninput="recalcAll()"></td>
           </tr>
         </tbody>
       </table>
-
-      <div id="cur-formula" class="formula-box" style="margin-top:12px;"></div>
-
-      <div class="result-box">
-        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px;" id="cur-result-title">공제액 결과</div>
-        <div class="result-grid" id="cur-result-grid"></div>
-      </div>
     </div>
   </div>
 
-  <!-- ── 구버전 (개정 전) ──────────────── -->
+  <!-- ── 구버전 23년 당기 ──────────────── -->
+  <div class="panel old23-panel">
+    <div class="panel-header"><span class="icon">📊</span> 구버전 2023년 당기 (23년 vs 22년)</div>
+    <div class="panel-body" id="o23-content"></div>
+  </div>
+
+  <!-- ── 구버전 24년 당기 ──────────────── -->
+  <div class="panel old24-panel">
+    <div class="panel-header"><span class="icon">📊</span> 구버전 2024년 당기 (24년 vs 23년)</div>
+    <div class="panel-body" id="o24-content"></div>
+  </div>
+
+  <!-- ── 개정 25년 당기 ──────────────── -->
   <div class="panel">
-    <div class="panel-header"><span class="icon">📋</span> 구버전 (개정 전) — <span id="old-year-label">2023</span>년 당기</div>
-    <div class="panel-body">
-      <p style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">개정 전 명세서에서 산출된 상시근로자 수를 입력하세요. 추가공제 해당 연도분이 올해 공제에 합산됩니다.</p>
-      <table class="calc-table" id="old-table">
-        <thead>
-          <tr>
-            <th rowspan="2" style="width:160px;">구 분</th>
-            <th colspan="3" class="youth-hdr">청년등</th>
-            <th colspan="3" class="normal-hdr" id="old-normal-hdr">청년등외</th>
-          </tr>
-          <tr>
-            <th>당기</th><th>전기</th><th>증가분</th>
-            <th id="old-nh1">당기</th><th id="old-nh2">전기</th><th id="old-nh3">증가분</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr id="old-metro-row">
-            <td class="label-cell">수도권</td>
-            <td><input type="number" id="old-youth-metro-cur" step="0.01" value="0" oninput="recalcOld()"></td>
-            <td><input type="number" id="old-youth-metro-prev" step="0.01" value="0" oninput="recalcOld()"></td>
-            <td class="result" id="old-youth-metro-diff">0</td>
-            <td><input type="number" id="old-normal-metro-cur" step="0.01" value="0" oninput="recalcOld()"></td>
-            <td><input type="number" id="old-normal-metro-prev" step="0.01" value="0" oninput="recalcOld()"></td>
-            <td class="result" id="old-normal-metro-diff">0</td>
-          </tr>
-          <tr id="old-local-row">
-            <td class="label-cell">비수도권 (지방)</td>
-            <td><input type="number" id="old-youth-local-cur" step="0.01" value="0" oninput="recalcOld()"></td>
-            <td><input type="number" id="old-youth-local-prev" step="0.01" value="0" oninput="recalcOld()"></td>
-            <td class="result" id="old-youth-local-diff">0</td>
-            <td><input type="number" id="old-normal-local-cur" step="0.01" value="0" oninput="recalcOld()"></td>
-            <td><input type="number" id="old-normal-local-prev" step="0.01" value="0" oninput="recalcOld()"></td>
-            <td class="result" id="old-normal-local-diff">0</td>
-          </tr>
-          <tr class="total-row">
-            <td class="label-cell">합 계</td>
-            <td id="old-youth-total-cur">0</td>
-            <td id="old-youth-total-prev">0</td>
-            <td id="old-youth-total-diff">0</td>
-            <td id="old-normal-total-cur">0</td>
-            <td id="old-normal-total-prev">0</td>
-            <td id="old-normal-total-diff">0</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div id="old-formula" class="formula-box" style="margin-top:12px;"></div>
-
-      <!-- 추가공제 유지 확인 -->
-      <div style="margin-top:16px;padding-top:14px;border-top:2px dashed var(--border);">
-        <p style="font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:8px;">
-          추가공제 유지 확인 — <span id="old-addtl-year-label">2025</span>년 상시근로자수 입력
-        </p>
-        <p style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">
-          추가공제 해당연도의 근로자수를 입력하세요. 당기 전기 대비 증가가 유지된 범위 내에서 추가공제가 적용됩니다.
-        </p>
-        <table class="calc-table" id="old-addtl-table">
-          <thead>
-            <tr>
-              <th rowspan="2" style="width:160px;">구 분</th>
-              <th colspan="2" class="youth-hdr">청년등</th>
-              <th colspan="2" class="normal-hdr" id="old-addtl-normal-hdr">청년등외</th>
-            </tr>
-            <tr>
-              <th id="old-addtl-yh">추가공제연도</th><th>유지 증가분</th>
-              <th id="old-addtl-nh">추가공제연도</th><th id="old-addtl-nh2">유지 증가분</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr id="old-addtl-metro-row">
-              <td class="label-cell">수도권</td>
-              <td><input type="number" id="old-addtl-youth-metro" step="0.01" value="0" oninput="recalcOld()"></td>
-              <td class="result-green" id="old-addtl-youth-metro-kept">0</td>
-              <td><input type="number" id="old-addtl-normal-metro" step="0.01" value="0" oninput="recalcOld()"></td>
-              <td class="result-green" id="old-addtl-normal-metro-kept">0</td>
-            </tr>
-            <tr id="old-addtl-local-row">
-              <td class="label-cell">비수도권 (지방)</td>
-              <td><input type="number" id="old-addtl-youth-local" step="0.01" value="0" oninput="recalcOld()"></td>
-              <td class="result-green" id="old-addtl-youth-local-kept">0</td>
-              <td><input type="number" id="old-addtl-normal-local" step="0.01" value="0" oninput="recalcOld()"></td>
-              <td class="result-green" id="old-addtl-normal-local-kept">0</td>
-            </tr>
-          </tbody>
-        </table>
-        <div id="old-addtl-formula" class="formula-box" style="margin-top:10px;"></div>
-      </div>
-
-      <div class="result-box" style="margin-top:12px;">
-        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px;" id="old-result-title">공제액 결과</div>
-        <div class="result-grid" id="old-result-grid"></div>
-      </div>
-    </div>
+    <div class="panel-header"><span class="icon">📊</span> 개정(현행) 2025년 당기 (25년 vs 24년)</div>
+    <div class="panel-body" id="cur-content"></div>
   </div>
 
-  <!-- ── 올해 공제 합계 ──────────────── -->
+  <!-- ── 2025년 합계 ──────────────── -->
   <div class="panel total-panel">
-    <div class="panel-header"><span class="icon">💰</span> <span id="total-year-label">2025</span>년 세액공제 합계</div>
-    <div class="panel-body">
-      <div class="result-grid" id="total-result-grid"></div>
-      <div id="total-formula" class="formula-box" style="margin-top:12px;"></div>
-    </div>
+    <div class="panel-header"><span class="icon">💰</span> 2025년 세액공제 합계</div>
+    <div class="panel-body" id="total-content"></div>
   </div>
 
 </div>
@@ -384,7 +285,7 @@ const RATES = {
   '중소': {
     youth:  { metro: 1450, local: 1550 },
     normal: { metro: 850,  local: 950  },
-    years: 3  // 당기 + 추가1 + 추가2
+    years: 3
   },
   '중견': {
     youth:  { metro: 800, local: 800 },
@@ -394,7 +295,7 @@ const RATES = {
   '대기업': {
     youth:  { metro: 400, local: 400 },
     normal: { metro: 0,   local: 0   },
-    years: 2  // 당기 + 추가1
+    years: 2
   }
 };
 
@@ -402,441 +303,288 @@ const RATES = {
 // HELPERS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function V(id) { return parseFloat(document.getElementById(id).value) || 0; }
-function T(id, v) { document.getElementById(id).textContent = v; }
 function fmt(n) { return n.toLocaleString('ko-KR'); }
-function fmtDec(n) { return Number.isInteger(n) ? n.toString() : n.toFixed(2); }
-
+function fmtD(n) { return Number.isInteger(n) ? n.toString() : n.toFixed(2); }
 function getCorpType() { return document.getElementById('corp-type').value; }
-function getCurYear() { return parseInt(document.getElementById('cur-year').value); }
-function getOldYear() { return parseInt(document.getElementById('old-year').value); }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 공제액 계산 함수
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function calcCredit(corpType, youthMetroDiff, youthLocalDiff, normalMetroDiff, normalLocalDiff) {
-  const rate = RATES[corpType];
-
-  const youthMetroInc  = Math.max(0, youthMetroDiff);
-  const youthLocalInc  = Math.max(0, youthLocalDiff);
-  const normalMetroInc = Math.max(0, normalMetroDiff);
-  const normalLocalInc = Math.max(0, normalLocalDiff);
-
-  const youthMetroAmt  = youthMetroInc  * rate.youth.metro;
-  const youthLocalAmt  = youthLocalInc  * rate.youth.local;
-  const normalMetroAmt = normalMetroInc * rate.normal.metro;
-  const normalLocalAmt = normalLocalInc * rate.normal.local;
-
-  const youthTotal  = youthMetroAmt + youthLocalAmt;
-  const normalTotal = normalMetroAmt + normalLocalAmt;
-  const total = youthTotal + normalTotal;
-
+function getW(year) {
   return {
-    youthMetroInc, youthLocalInc, normalMetroInc, normalLocalInc,
-    youthMetroAmt, youthLocalAmt, normalMetroAmt, normalLocalAmt,
-    youthTotal, normalTotal, total,
-    rate, years: rate.years
+    ym: V('w' + year + '-youth-metro'),
+    yl: V('w' + year + '-youth-local'),
+    nm: V('w' + year + '-normal-metro'),
+    nl: V('w' + year + '-normal-local')
+  };
+}
+
+function diffW(cur, prev) {
+  return {
+    ym: cur.ym - prev.ym,
+    yl: cur.yl - prev.yl,
+    nm: cur.nm - prev.nm,
+    nl: cur.nl - prev.nl
   };
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 수도권/비수도권 행 표시 제어
+// 당기공제 계산
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function calcDanggi(corp, diff) {
+  const rate = RATES[corp];
+  const inc = {
+    ym: Math.max(0, diff.ym),
+    yl: Math.max(0, diff.yl),
+    nm: Math.max(0, diff.nm),
+    nl: Math.max(0, diff.nl)
+  };
+  const amt = {
+    ym: inc.ym * rate.youth.metro,
+    yl: inc.yl * rate.youth.local,
+    nm: inc.nm * rate.normal.metro,
+    nl: inc.nl * rate.normal.local
+  };
+  const total = amt.ym + amt.yl + amt.nm + amt.nl;
+  return { inc, amt, total, rate };
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 추가공제 유지확인 계산
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function calcAddtl(corp, danggiDiff, addtlW, prevW) {
+  const rate = RATES[corp];
+  // 유지 증가분 = MAX(0, 추가공제연도 - 전기)
+  const kept = {
+    ym: Math.max(0, addtlW.ym - prevW.ym),
+    yl: Math.max(0, addtlW.yl - prevW.yl),
+    nm: Math.max(0, addtlW.nm - prevW.nm),
+    nl: Math.max(0, addtlW.nl - prevW.nl)
+  };
+  // 추가공제 증가분 = MIN(당기 증가분, 유지 증가분)
+  const inc = {
+    ym: Math.min(Math.max(0, danggiDiff.ym), kept.ym),
+    yl: Math.min(Math.max(0, danggiDiff.yl), kept.yl),
+    nm: Math.min(Math.max(0, danggiDiff.nm), kept.nm),
+    nl: Math.min(Math.max(0, danggiDiff.nl), kept.nl)
+  };
+  const amt = {
+    ym: inc.ym * rate.youth.metro,
+    yl: inc.yl * rate.youth.local,
+    nm: inc.nm * rate.normal.metro,
+    nl: inc.nl * rate.normal.local
+  };
+  const total = amt.ym + amt.yl + amt.nm + amt.nl;
+  return { kept, inc, amt, total, rate };
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 계산식 HTML 생성 헬퍼
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function formulaDanggi(title, d, corp) {
+  const rate = RATES[corp];
+  const isSmall = (corp === '중소');
+  const hasNormal = (corp !== '대기업');
+  let h = `<div class="formula-box"><div class="formula-title">${title}</div>`;
+  if (isSmall) {
+    h += `청년등 수도권: <code>MAX(0, ${fmtD(d.inc.ym)}) × ${fmt(rate.youth.metro)}만 = ${fmt(d.amt.ym)}만원</code><br>`;
+    h += `청년등 비수도권: <code>MAX(0, ${fmtD(d.inc.yl)}) × ${fmt(rate.youth.local)}만 = ${fmt(d.amt.yl)}만원</code><br>`;
+    if (hasNormal) {
+      h += `청년등외 수도권: <code>MAX(0, ${fmtD(d.inc.nm)}) × ${fmt(rate.normal.metro)}만 = ${fmt(d.amt.nm)}만원</code><br>`;
+      h += `청년등외 비수도권: <code>MAX(0, ${fmtD(d.inc.nl)}) × ${fmt(rate.normal.local)}만 = ${fmt(d.amt.nl)}만원</code><br>`;
+    }
+  } else {
+    h += `청년등: <code>MAX(0, ${fmtD(d.inc.ym)}) × ${fmt(rate.youth.metro)}만 = ${fmt(d.amt.ym)}만원</code><br>`;
+    if (hasNormal) {
+      h += `청년등외: <code>MAX(0, ${fmtD(d.inc.nm)}) × ${fmt(rate.normal.metro)}만 = ${fmt(d.amt.nm)}만원</code><br>`;
+    }
+  }
+  h += `<strong>당기공제액: <code>${fmt(d.total)}만원</code></strong></div>`;
+  return h;
+}
+
+function formulaAddtl(title, danggiDiff, a, corp) {
+  const rate = RATES[corp];
+  const isSmall = (corp === '중소');
+  const hasNormal = (corp !== '대기업');
+  let h = `<div class="formula-box"><div class="formula-title green">${title}</div>`;
+  h += `유지 증가분 = MAX(0, 추가공제연도 근로자수 − 전기 근로자수)<br>`;
+  h += `추가공제 증가분 = MIN(당기 증가분, 유지 증가분)<br><br>`;
+  if (isSmall) {
+    h += `청년등 수도권: <code>MIN(${fmtD(Math.max(0,danggiDiff.ym))}, ${fmtD(a.kept.ym)}) = ${fmtD(a.inc.ym)} × ${fmt(rate.youth.metro)}만 = ${fmt(a.amt.ym)}만원</code><br>`;
+    h += `청년등 비수도권: <code>MIN(${fmtD(Math.max(0,danggiDiff.yl))}, ${fmtD(a.kept.yl)}) = ${fmtD(a.inc.yl)} × ${fmt(rate.youth.local)}만 = ${fmt(a.amt.yl)}만원</code><br>`;
+    if (hasNormal) {
+      h += `청년등외 수도권: <code>MIN(${fmtD(Math.max(0,danggiDiff.nm))}, ${fmtD(a.kept.nm)}) = ${fmtD(a.inc.nm)} × ${fmt(rate.normal.metro)}만 = ${fmt(a.amt.nm)}만원</code><br>`;
+      h += `청년등외 비수도권: <code>MIN(${fmtD(Math.max(0,danggiDiff.nl))}, ${fmtD(a.kept.nl)}) = ${fmtD(a.inc.nl)} × ${fmt(rate.normal.local)}만 = ${fmt(a.amt.nl)}만원</code><br>`;
+    }
+  } else {
+    h += `청년등: <code>MIN(${fmtD(Math.max(0,danggiDiff.ym))}, ${fmtD(a.kept.ym)}) = ${fmtD(a.inc.ym)} × ${fmt(rate.youth.metro)}만 = ${fmt(a.amt.ym)}만원</code><br>`;
+    if (hasNormal) {
+      h += `청년등외: <code>MIN(${fmtD(Math.max(0,danggiDiff.nm))}, ${fmtD(a.kept.nm)}) = ${fmtD(a.inc.nm)} × ${fmt(rate.normal.metro)}만 = ${fmt(a.amt.nm)}만원</code><br>`;
+    }
+  }
+  h += `<strong>추가공제액: <code>${fmt(a.total)}만원</code></strong></div>`;
+  return h;
+}
+
+function addtlSub(danggiTotal, addtlTotal) {
+  if (addtlTotal === 0 && danggiTotal === 0) return '증가 없음';
+  if (addtlTotal === 0) return '증가 미유지';
+  if (addtlTotal < danggiTotal) return '유지 미달로 감소';
+  return '고용 유지 확인';
+}
+
+function resultCard(label, val, sub, type) {
+  return `<div class="result-card ${type||''}">
+    <div class="rc-label">${label}</div>
+    <div class="rc-val">${fmt(val)}만원</div>
+    <div class="rc-sub">${sub}</div>
+  </div>`;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 입력 테이블 레이아웃 제어
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function updateLayout() {
   const corp = getCorpType();
-  const showRegion = (corp === '중소');
-  const showNormal = (corp !== '대기업');
+  const isSmall = (corp === '중소');
+  const hasNormal = (corp !== '대기업');
 
-  // 수도권/비수도권 분리 표시 (중소만)
-  ['cur', 'old'].forEach(prefix => {
-    const metroRow = document.getElementById(prefix + '-metro-row');
-    const localRow = document.getElementById(prefix + '-local-row');
+  // 비수도권 열 + 청년등외 열 표시
+  const ylHdr = document.getElementById('input-yl-hdr');
+  const nmHdr = document.getElementById('input-nm-hdr');
+  const nlHdr = document.getElementById('input-nl-hdr');
+  const normalHdr = document.getElementById('input-normal-hdr');
 
-    if (showRegion) {
-      metroRow.style.display = '';
-      localRow.style.display = '';
-      metroRow.querySelector('.label-cell').textContent = '수도권';
-      localRow.querySelector('.label-cell').textContent = '비수도권 (지방)';
-    } else {
-      metroRow.style.display = '';
-      localRow.style.display = 'none';
-      metroRow.querySelector('.label-cell').textContent = '전 체';
-    }
+  ylHdr.style.display = isSmall ? '' : 'none';
+  normalHdr.style.display = hasNormal ? '' : 'none';
+  nmHdr.style.display = (isSmall && hasNormal) ? '' : (hasNormal ? '' : 'none');
+  nlHdr.style.display = (isSmall && hasNormal) ? '' : 'none';
 
-    // 청년등외 열 표시 (대기업은 숨김)
-    const normalHdr = document.getElementById(prefix + '-normal-hdr');
-    const nh1 = document.getElementById(prefix + '-nh1');
-    const nh2 = document.getElementById(prefix + '-nh2');
-    const nh3 = document.getElementById(prefix + '-nh3');
-    [normalHdr, nh1, nh2, nh3].forEach(el => el.style.display = showNormal ? '' : 'none');
+  // 중소가 아니면 비수도권 column에 "전 체" 표시 대신 숨김
+  // 중견/대기업은 수도권 header를 "전 체"로 변경
+  const youthHeaders = document.querySelectorAll('#input-table thead tr:nth-child(2) th.youth-hdr');
+  if (youthHeaders.length >= 1) {
+    youthHeaders[0].textContent = isSmall ? '수도권' : '전 체';
+  }
+  if (nmHdr) {
+    nmHdr.textContent = isSmall ? '수도권' : '전 체';
+  }
 
-    // 데이터 셀도 숨김 처리
-    const table = document.getElementById(prefix + '-table');
-    table.querySelectorAll('tbody tr').forEach(tr => {
-      const cells = tr.querySelectorAll('td');
-      if (cells.length >= 7) {
-        [cells[4], cells[5], cells[6]].forEach(td => td.style.display = showNormal ? '' : 'none');
-      }
-    });
+  [22, 23, 24, 25].forEach(yr => {
+    const ylTd = document.getElementById('td-w' + yr + '-yl');
+    const nmTd = document.getElementById('td-w' + yr + '-nm');
+    const nlTd = document.getElementById('td-w' + yr + '-nl');
+    if (ylTd) ylTd.style.display = isSmall ? '' : 'none';
+    if (nmTd) nmTd.style.display = hasNormal ? '' : 'none';
+    if (nlTd) nlTd.style.display = (isSmall && hasNormal) ? '' : 'none';
   });
-
-  // 추가공제 유지 확인 테이블 (구버전 전용)
-  const addtlMetroRow = document.getElementById('old-addtl-metro-row');
-  const addtlLocalRow = document.getElementById('old-addtl-local-row');
-  if (showRegion) {
-    addtlMetroRow.style.display = '';
-    addtlLocalRow.style.display = '';
-    addtlMetroRow.querySelector('.label-cell').textContent = '수도권';
-    addtlLocalRow.querySelector('.label-cell').textContent = '비수도권 (지방)';
-  } else {
-    addtlMetroRow.style.display = '';
-    addtlLocalRow.style.display = 'none';
-    addtlMetroRow.querySelector('.label-cell').textContent = '전 체';
-  }
-  // 청년등외 열 숨김 (대기업)
-  const addtlNormalHdr = document.getElementById('old-addtl-normal-hdr');
-  const addtlNh = document.getElementById('old-addtl-nh');
-  const addtlNh2 = document.getElementById('old-addtl-nh2');
-  [addtlNormalHdr, addtlNh, addtlNh2].forEach(el => el.style.display = showNormal ? '' : 'none');
-  const addtlTable = document.getElementById('old-addtl-table');
-  addtlTable.querySelectorAll('tbody tr').forEach(tr => {
-    const cells = tr.querySelectorAll('td');
-    if (cells.length >= 5) {
-      [cells[3], cells[4]].forEach(td => td.style.display = showNormal ? '' : 'none');
-    }
-  });
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 현행 계산
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-let curResult = null;
-
-function recalcCur() {
-  const corp = getCorpType();
-  const curYear = getCurYear();
-
-  const ymCur = V('cur-youth-metro-cur'), ymPrev = V('cur-youth-metro-prev');
-  const ylCur = V('cur-youth-local-cur'), ylPrev = V('cur-youth-local-prev');
-  const nmCur = V('cur-normal-metro-cur'), nmPrev = V('cur-normal-metro-prev');
-  const nlCur = V('cur-normal-local-cur'), nlPrev = V('cur-normal-local-prev');
-
-  const ymDiff = ymCur - ymPrev;
-  const ylDiff = ylCur - ylPrev;
-  const nmDiff = nmCur - nmPrev;
-  const nlDiff = nlCur - nlPrev;
-
-  T('cur-youth-metro-diff', fmtDec(ymDiff));
-  T('cur-youth-local-diff', fmtDec(ylDiff));
-  T('cur-normal-metro-diff', fmtDec(nmDiff));
-  T('cur-normal-local-diff', fmtDec(nlDiff));
-
-  T('cur-youth-total-cur', fmtDec(ymCur + ylCur));
-  T('cur-youth-total-prev', fmtDec(ymPrev + ylPrev));
-  T('cur-youth-total-diff', fmtDec(ymDiff + ylDiff));
-  T('cur-normal-total-cur', fmtDec(nmCur + nlCur));
-  T('cur-normal-total-prev', fmtDec(nmPrev + nlPrev));
-  T('cur-normal-total-diff', fmtDec(nmDiff + nlDiff));
-
-  curResult = calcCredit(corp, ymDiff, ylDiff, nmDiff, nlDiff);
-  renderCurResults(curResult, curYear, corp);
-  recalcTotal();
-}
-
-function renderCurResults(r, year, corp) {
-  const rate = r.rate;
-  const showRegion = (corp === '중소');
-  const showNormal = (corp !== '대기업');
-
-  // 계산식
-  let formulaHtml = `<div class="formula-title">계산식</div>`;
-  if (showRegion) {
-    formulaHtml += `청년등 수도권: <code>MAX(0, ${fmtDec(r.youthMetroInc)}) × ${fmt(rate.youth.metro)}만 = ${fmt(r.youthMetroAmt)}만원</code><br>`;
-    formulaHtml += `청년등 비수도권: <code>MAX(0, ${fmtDec(r.youthLocalInc)}) × ${fmt(rate.youth.local)}만 = ${fmt(r.youthLocalAmt)}만원</code><br>`;
-    if (showNormal) {
-      formulaHtml += `청년등외 수도권: <code>MAX(0, ${fmtDec(r.normalMetroInc)}) × ${fmt(rate.normal.metro)}만 = ${fmt(r.normalMetroAmt)}만원</code><br>`;
-      formulaHtml += `청년등외 비수도권: <code>MAX(0, ${fmtDec(r.normalLocalInc)}) × ${fmt(rate.normal.local)}만 = ${fmt(r.normalLocalAmt)}만원</code><br>`;
-    }
-  } else {
-    formulaHtml += `청년등: <code>MAX(0, ${fmtDec(r.youthMetroInc)}) × ${fmt(rate.youth.metro)}만 = ${fmt(r.youthMetroAmt)}만원</code><br>`;
-    if (showNormal) {
-      formulaHtml += `청년등외: <code>MAX(0, ${fmtDec(r.normalMetroInc)}) × ${fmt(rate.normal.metro)}만 = ${fmt(r.normalMetroAmt)}만원</code><br>`;
-    }
-  }
-  formulaHtml += `<strong>합계: <code>${fmt(r.total)}만원</code></strong>`;
-  document.getElementById('cur-formula').innerHTML = formulaHtml;
-
-  // 결과 카드
-  const maxYears = r.years;
-  let cards = `
-    <div class="result-card blue">
-      <div class="rc-label">${year}년 당기공제</div>
-      <div class="rc-val">${fmt(r.total)}만원</div>
-      <div class="rc-sub">증가분 × 단가</div>
-    </div>
-    <div class="result-card green">
-      <div class="rc-label">${year+1}년 추가공제 (1차)</div>
-      <div class="rc-val">${fmt(r.total)}만원</div>
-      <div class="rc-sub">고용 유지 시 동일 금액</div>
-    </div>`;
-  if (maxYears >= 3) {
-    cards += `
-    <div class="result-card green">
-      <div class="rc-label">${year+2}년 추가공제 (2차)</div>
-      <div class="rc-val">${fmt(r.total)}만원</div>
-      <div class="rc-sub">고용 유지 시 동일 금액</div>
-    </div>`;
-  }
-  cards += `
-    <div class="result-card highlight">
-      <div class="rc-label">${maxYears}년간 총 공제 예상</div>
-      <div class="rc-val">${fmt(r.total * maxYears)}만원</div>
-      <div class="rc-sub">${fmt(r.total)}만 × ${maxYears}년</div>
-    </div>`;
-  document.getElementById('cur-result-grid').innerHTML = cards;
-  document.getElementById('cur-result-title').textContent = `${year}년 당기 + 추가공제 결과 (${corp}기업 / ${maxYears}년 공제)`;
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 구버전 계산
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-let oldResult = null;
-
-function recalcOld() {
-  const corp = getCorpType();
-  const oldYear = getOldYear();
-  const rate = RATES[corp];
-
-  const ymCur = V('old-youth-metro-cur'), ymPrev = V('old-youth-metro-prev');
-  const ylCur = V('old-youth-local-cur'), ylPrev = V('old-youth-local-prev');
-  const nmCur = V('old-normal-metro-cur'), nmPrev = V('old-normal-metro-prev');
-  const nlCur = V('old-normal-local-cur'), nlPrev = V('old-normal-local-prev');
-
-  const ymDiff = ymCur - ymPrev;
-  const ylDiff = ylCur - ylPrev;
-  const nmDiff = nmCur - nmPrev;
-  const nlDiff = nlCur - nlPrev;
-
-  T('old-youth-metro-diff', fmtDec(ymDiff));
-  T('old-youth-local-diff', fmtDec(ylDiff));
-  T('old-normal-metro-diff', fmtDec(nmDiff));
-  T('old-normal-local-diff', fmtDec(nlDiff));
-
-  T('old-youth-total-cur', fmtDec(ymCur + ylCur));
-  T('old-youth-total-prev', fmtDec(ymPrev + ylPrev));
-  T('old-youth-total-diff', fmtDec(ymDiff + ylDiff));
-  T('old-normal-total-cur', fmtDec(nmCur + nlCur));
-  T('old-normal-total-prev', fmtDec(nmPrev + nlPrev));
-  T('old-normal-total-diff', fmtDec(nmDiff + nlDiff));
-
-  oldResult = calcCredit(corp, ymDiff, ylDiff, nmDiff, nlDiff);
-
-  // 추가공제 유지 확인: 추가공제연도 근로자수 vs 당기 전기 근로자수
-  const addtlYm = V('old-addtl-youth-metro');
-  const addtlYl = V('old-addtl-youth-local');
-  const addtlNm = V('old-addtl-normal-metro');
-  const addtlNl = V('old-addtl-normal-local');
-
-  // 유지 증가분 = MAX(0, 추가공제연도 근로자수 - 당기의 전기 근로자수)
-  const keptYm = Math.max(0, addtlYm - ymPrev);
-  const keptYl = Math.max(0, addtlYl - ylPrev);
-  const keptNm = Math.max(0, addtlNm - nmPrev);
-  const keptNl = Math.max(0, addtlNl - nlPrev);
-
-  T('old-addtl-youth-metro-kept', fmtDec(keptYm));
-  T('old-addtl-youth-local-kept', fmtDec(keptYl));
-  T('old-addtl-normal-metro-kept', fmtDec(keptNm));
-  T('old-addtl-normal-local-kept', fmtDec(keptNl));
-
-  // 추가공제 증가분 = MIN(당기 증가분, 유지 증가분) — 음수면 0
-  const addtlIncYm = Math.min(Math.max(0, ymDiff), keptYm);
-  const addtlIncYl = Math.min(Math.max(0, ylDiff), keptYl);
-  const addtlIncNm = Math.min(Math.max(0, nmDiff), keptNm);
-  const addtlIncNl = Math.min(Math.max(0, nlDiff), keptNl);
-
-  // 추가공제액 per category
-  const addtlAmtYm = addtlIncYm * rate.youth.metro;
-  const addtlAmtYl = addtlIncYl * rate.youth.local;
-  const addtlAmtNm = addtlIncNm * rate.normal.metro;
-  const addtlAmtNl = addtlIncNl * rate.normal.local;
-  const addtlTotal = addtlAmtYm + addtlAmtYl + addtlAmtNm + addtlAmtNl;
-
-  // Store addtl results on oldResult for use by renderOldResults and recalcTotal
-  oldResult.addtl = {
-    keptYm, keptYl, keptNm, keptNl,
-    incYm: addtlIncYm, incYl: addtlIncYl, incNm: addtlIncNm, incNl: addtlIncNl,
-    amtYm: addtlAmtYm, amtYl: addtlAmtYl, amtNm: addtlAmtNm, amtNl: addtlAmtNl,
-    total: addtlTotal
-  };
-
-  // 추가공제 유지 확인 formula
-  const showRegion = (corp === '중소');
-  const showNormal = (corp !== '대기업');
-  let af = `<div class="formula-title">추가공제 유지 확인 계산식</div>`;
-  af += `유지 증가분 = MAX(0, 추가공제연도 근로자수 − 당기 전기 근로자수)<br>`;
-  af += `추가공제 증가분 = MIN(당기 증가분, 유지 증가분)<br><br>`;
-  if (showRegion) {
-    af += `청년등 수도권: <code>MIN(${fmtDec(Math.max(0,ymDiff))}, ${fmtDec(keptYm)}) × ${fmt(rate.youth.metro)}만 = ${fmt(addtlAmtYm)}만원</code><br>`;
-    af += `청년등 비수도권: <code>MIN(${fmtDec(Math.max(0,ylDiff))}, ${fmtDec(keptYl)}) × ${fmt(rate.youth.local)}만 = ${fmt(addtlAmtYl)}만원</code><br>`;
-    if (showNormal) {
-      af += `청년등외 수도권: <code>MIN(${fmtDec(Math.max(0,nmDiff))}, ${fmtDec(keptNm)}) × ${fmt(rate.normal.metro)}만 = ${fmt(addtlAmtNm)}만원</code><br>`;
-      af += `청년등외 비수도권: <code>MIN(${fmtDec(Math.max(0,nlDiff))}, ${fmtDec(keptNl)}) × ${fmt(rate.normal.local)}만 = ${fmt(addtlAmtNl)}만원</code><br>`;
-    }
-  } else {
-    af += `청년등: <code>MIN(${fmtDec(Math.max(0,ymDiff))}, ${fmtDec(keptYm)}) × ${fmt(rate.youth.metro)}만 = ${fmt(addtlAmtYm)}만원</code><br>`;
-    if (showNormal) {
-      af += `청년등외: <code>MIN(${fmtDec(Math.max(0,nmDiff))}, ${fmtDec(keptNm)}) × ${fmt(rate.normal.metro)}만 = ${fmt(addtlAmtNm)}만원</code><br>`;
-    }
-  }
-  af += `<strong>추가공제액: <code>${fmt(addtlTotal)}만원</code></strong> (당기공제 ${fmt(oldResult.total)}만원 대비)`;
-  document.getElementById('old-addtl-formula').innerHTML = af;
-
-  renderOldResults(oldResult, oldYear, corp);
-  recalcTotal();
-}
-
-function renderOldResults(r, oldYear, corp) {
-  const rate = r.rate;
-  const showRegion = (corp === '중소');
-  const showNormal = (corp !== '대기업');
-  const maxYears = r.years;
-  const addtl = r.addtl || { total: 0 };
-
-  // 당기공제 계산식
-  let formulaHtml = `<div class="formula-title">당기공제 계산식</div>`;
-  if (showRegion) {
-    formulaHtml += `청년등 수도권: <code>MAX(0, ${fmtDec(r.youthMetroInc)}) × ${fmt(rate.youth.metro)}만 = ${fmt(r.youthMetroAmt)}만원</code><br>`;
-    formulaHtml += `청년등 비수도권: <code>MAX(0, ${fmtDec(r.youthLocalInc)}) × ${fmt(rate.youth.local)}만 = ${fmt(r.youthLocalAmt)}만원</code><br>`;
-    if (showNormal) {
-      formulaHtml += `청년등외 수도권: <code>MAX(0, ${fmtDec(r.normalMetroInc)}) × ${fmt(rate.normal.metro)}만 = ${fmt(r.normalMetroAmt)}만원</code><br>`;
-      formulaHtml += `청년등외 비수도권: <code>MAX(0, ${fmtDec(r.normalLocalInc)}) × ${fmt(rate.normal.local)}만 = ${fmt(r.normalLocalAmt)}만원</code><br>`;
-    }
-  } else {
-    formulaHtml += `청년등: <code>MAX(0, ${fmtDec(r.youthMetroInc)}) × ${fmt(rate.youth.metro)}만 = ${fmt(r.youthMetroAmt)}만원</code><br>`;
-    if (showNormal) {
-      formulaHtml += `청년등외: <code>MAX(0, ${fmtDec(r.normalMetroInc)}) × ${fmt(rate.normal.metro)}만 = ${fmt(r.normalMetroAmt)}만원</code><br>`;
-    }
-  }
-  formulaHtml += `<strong>당기공제액: <code>${fmt(r.total)}만원</code></strong>`;
-  document.getElementById('old-formula').innerHTML = formulaHtml;
-
-  // 결과 카드
-  let cards = `
-    <div class="result-card blue">
-      <div class="rc-label">${oldYear}년 당기공제</div>
-      <div class="rc-val">${fmt(r.total)}만원</div>
-      <div class="rc-sub">이미 공제 완료</div>
-    </div>
-    <div class="result-card green">
-      <div class="rc-label">${oldYear+1}년 추가공제 (1차)</div>
-      <div class="rc-val">${fmt(addtl.total)}만원</div>
-      <div class="rc-sub">${addtl.total < r.total ? '유지 미달로 감소' : (addtl.total > 0 ? '고용 유지 확인' : '증가 미유지')}</div>
-    </div>`;
-  if (maxYears >= 3) {
-    cards += `
-    <div class="result-card green">
-      <div class="rc-label">${oldYear+2}년 추가공제 (2차)</div>
-      <div class="rc-val">${fmt(addtl.total)}만원</div>
-      <div class="rc-sub">${addtl.total < r.total ? '유지 미달로 감소' : (addtl.total > 0 ? '고용 유지 확인' : '증가 미유지')}</div>
-    </div>`;
-  }
-  const totalEst = r.total + addtl.total * (maxYears - 1);
-  cards += `
-    <div class="result-card highlight">
-      <div class="rc-label">${maxYears}년간 총 공제 예상</div>
-      <div class="rc-val">${fmt(totalEst)}만원</div>
-      <div class="rc-sub">당기 ${fmt(r.total)} + 추가 ${fmt(addtl.total)}만 × ${maxYears - 1}년</div>
-    </div>`;
-  document.getElementById('old-result-grid').innerHTML = cards;
-  document.getElementById('old-result-title').textContent = `${oldYear}년 당기 + 추가공제 결과 (${corp}기업 / ${maxYears}년 공제)`;
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 올해 합계
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function recalcTotal() {
-  const curYear = getCurYear();
-  const oldYear = getOldYear();
-  const corp = getCorpType();
-  const maxYears = RATES[corp].years;
-
-  const curAmt = curResult ? curResult.total : 0;
-  const oldAddtl = (oldResult && oldResult.addtl) ? oldResult.addtl.total : 0;
-  const oldDanggi = oldResult ? oldResult.total : 0;
-
-  // 구버전 당기에서 올해까지 몇 년차인지 계산
-  const yearDiff = curYear - oldYear; // ex: 2025-2023=2, 2025-2024=1
-  let oldApplicable = 0;
-  let oldLabel = '';
-
-  if (yearDiff >= 1 && yearDiff <= maxYears - 1) {
-    oldApplicable = oldAddtl; // 유지 확인된 추가공제액
-    oldLabel = `${oldYear}년 당기의 ${yearDiff === 1 ? '1차' : '2차'} 추가공제`;
-  } else if (yearDiff === 0) {
-    oldApplicable = oldDanggi;
-    oldLabel = `${oldYear}년 당기공제`;
-  }
-
-  const totalAmt = curAmt + oldApplicable;
-
-  T('total-year-label', curYear);
-
-  let cards = `
-    <div class="result-card blue">
-      <div class="rc-label">현행 당기공제 (${curYear}년)</div>
-      <div class="rc-val">${fmt(curAmt)}만원</div>
-      <div class="rc-sub">개정 후 기준</div>
-    </div>`;
-
-  if (oldApplicable > 0) {
-    cards += `
-    <div class="result-card green">
-      <div class="rc-label">구버전 추가공제</div>
-      <div class="rc-val">${fmt(oldApplicable)}만원</div>
-      <div class="rc-sub">${oldLabel}</div>
-    </div>`;
-  } else {
-    cards += `
-    <div class="result-card">
-      <div class="rc-label">구버전 추가공제</div>
-      <div class="rc-val">0만원</div>
-      <div class="rc-sub">${oldYear}년 당기 → ${curYear}년 해당 없음</div>
-    </div>`;
-  }
-
-  cards += `
-    <div class="result-card highlight">
-      <div class="rc-label">${curYear}년 총 세액공제액</div>
-      <div class="rc-val">${fmt(totalAmt)}만원</div>
-      <div class="rc-sub">${fmt(curAmt)} + ${fmt(oldApplicable)} 만원</div>
-    </div>`;
-
-  document.getElementById('total-result-grid').innerHTML = cards;
-
-  // 합계 계산식
-  let formula = `<div class="formula-title">${curYear}년 세액공제 합계 산출</div>`;
-  formula += `현행 당기공제: <code>${fmt(curAmt)}만원</code><br>`;
-  if (oldApplicable > 0) {
-    formula += `구버전 추가공제 (${oldLabel}): <code>${fmt(oldApplicable)}만원</code><br>`;
-  }
-  formula += `<strong>합계: <code>${fmt(curAmt)} + ${fmt(oldApplicable)} = ${fmt(totalAmt)}만원</code></strong>`;
-  document.getElementById('total-formula').innerHTML = formula;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 전체 재계산
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function recalcAll() {
-  // 연도 라벨 업데이트
-  const curYear = getCurYear();
-  const oldYear = getOldYear();
-  T('cur-year-label', curYear);
-  T('old-year-label', oldYear);
-  T('total-year-label', curYear);
-  T('old-addtl-year-label', curYear);
-
   updateLayout();
-  recalcCur();
-  recalcOld();
+
+  const corp = getCorpType();
+  const maxYears = RATES[corp].years;
+
+  const w22 = getW(22), w23 = getW(23), w24 = getW(24), w25 = getW(25);
+
+  // ── 구버전 23년 당기 (23 vs 22) ──
+  const diff23 = diffW(w23, w22);
+  const danggi23 = calcDanggi(corp, diff23);
+
+  // 1차 추가공제 (24년 vs 22년)
+  const addtl23_1 = calcAddtl(corp, diff23, w24, w22);
+  // 2차 추가공제 (25년 vs 22년) — 중소/중견만
+  const addtl23_2 = (maxYears >= 3) ? calcAddtl(corp, diff23, w25, w22) : null;
+
+  let o23html = '';
+  o23html += formulaDanggi('당기공제 계산 (23년 vs 22년)', danggi23, corp);
+  o23html += formulaAddtl('1차 추가공제 유지확인 (24년 근로자수 vs 22년 전기)', diff23, addtl23_1, corp);
+  if (addtl23_2) {
+    o23html += formulaAddtl('2차 추가공제 유지확인 (25년 근로자수 vs 22년 전기)', diff23, addtl23_2, corp);
+  }
+  o23html += '<div class="result-box"><div style="font-size:12px;font-weight:700;margin-bottom:10px;">2023년 당기 공제 결과</div><div class="result-grid">';
+  o23html += resultCard('23년 당기공제', danggi23.total, '이미 공제 완료', 'blue');
+  o23html += resultCard('24년 1차 추가공제', addtl23_1.total, addtlSub(danggi23.total, addtl23_1.total), 'green');
+  if (addtl23_2) {
+    o23html += resultCard('25년 2차 추가공제', addtl23_2.total, addtlSub(danggi23.total, addtl23_2.total), 'green');
+  }
+  const total23 = danggi23.total + addtl23_1.total + (addtl23_2 ? addtl23_2.total : 0);
+  o23html += resultCard(maxYears + '년간 총합', total23, '당기 + 추가공제', 'highlight');
+  o23html += '</div></div>';
+  document.getElementById('o23-content').innerHTML = o23html;
+
+  // ── 구버전 24년 당기 (24 vs 23) ──
+  const diff24 = diffW(w24, w23);
+  const danggi24 = calcDanggi(corp, diff24);
+
+  // 1차 추가공제 (25년 vs 23년)
+  const addtl24_1 = calcAddtl(corp, diff24, w25, w23);
+
+  let o24html = '';
+  o24html += formulaDanggi('당기공제 계산 (24년 vs 23년)', danggi24, corp);
+  o24html += formulaAddtl('1차 추가공제 유지확인 (25년 근로자수 vs 23년 전기)', diff24, addtl24_1, corp);
+  o24html += '<div class="result-box"><div style="font-size:12px;font-weight:700;margin-bottom:10px;">2024년 당기 공제 결과</div><div class="result-grid">';
+  o24html += resultCard('24년 당기공제', danggi24.total, '이미 공제 완료', 'blue');
+  o24html += resultCard('25년 1차 추가공제', addtl24_1.total, addtlSub(danggi24.total, addtl24_1.total), 'green');
+  if (maxYears >= 3) {
+    o24html += resultCard('26년 2차 추가공제', danggi24.total, '유지 시 예상 (미래)', '');
+  }
+  const total24 = danggi24.total + addtl24_1.total + (maxYears >= 3 ? danggi24.total : 0);
+  o24html += resultCard(maxYears + '년간 총합 예상', total24, '2차는 유지 가정', 'highlight');
+  o24html += '</div></div>';
+  document.getElementById('o24-content').innerHTML = o24html;
+
+  // ── 개정 25년 당기 (25 vs 24) ──
+  const diff25 = diffW(w25, w24);
+  const danggi25 = calcDanggi(corp, diff25);
+
+  let curhtml = '';
+  curhtml += formulaDanggi('당기공제 계산 (25년 vs 24년)', danggi25, corp);
+  curhtml += '<div class="result-box"><div style="font-size:12px;font-weight:700;margin-bottom:10px;">2025년 당기 공제 결과</div><div class="result-grid">';
+  curhtml += resultCard('25년 당기공제', danggi25.total, '개정(현행) 기준', 'blue');
+  curhtml += resultCard('26년 1차 추가공제', danggi25.total, '유지 시 예상 (미래)', 'green');
+  if (maxYears >= 3) {
+    curhtml += resultCard('27년 2차 추가공제', danggi25.total, '유지 시 예상 (미래)', 'green');
+  }
+  curhtml += resultCard(maxYears + '년간 총합 예상', danggi25.total * maxYears, '유지 가정', 'highlight');
+  curhtml += '</div></div>';
+  document.getElementById('cur-content').innerHTML = curhtml;
+
+  // ── 2025년 합계 ──
+  // 25년에 적용되는 공제:
+  // - 구버전 23년 당기의 2차 추가공제 (중소/중견만, 25-23=2)
+  // - 구버전 24년 당기의 1차 추가공제 (25-24=1)
+  // - 개정 25년 당기공제
+  const from23 = addtl23_2 ? addtl23_2.total : 0; // 2차추가 (중소/중견)
+  const from24 = addtl24_1.total; // 1차추가
+  const from25 = danggi25.total; // 당기공제
+  const grandTotal = from23 + from24 + from25;
+
+  let totalhtml = '<div class="result-grid" style="margin-bottom:12px;">';
+  if (addtl23_2) {
+    totalhtml += resultCard('구버전 23년 → 2차 추가공제', from23, '25년 2차 추가 (23년 당기분)', from23 > 0 ? 'green' : '');
+  }
+  totalhtml += resultCard('구버전 24년 → 1차 추가공제', from24, '25년 1차 추가 (24년 당기분)', from24 > 0 ? 'green' : '');
+  totalhtml += resultCard('개정 25년 당기공제', from25, '25년 당기 (개정 기준)', from25 > 0 ? 'blue' : '');
+  totalhtml += resultCard('2025년 총 세액공제액', grandTotal, '', 'highlight');
+  totalhtml += '</div>';
+
+  // 합계 계산식
+  totalhtml += '<div class="formula-box"><div class="formula-title">2025년 세액공제 합계 산출</div>';
+  if (addtl23_2) {
+    totalhtml += `구버전 23년 당기 → 25년 2차 추가공제: <code>${fmt(from23)}만원</code><br>`;
+  }
+  totalhtml += `구버전 24년 당기 → 25년 1차 추가공제: <code>${fmt(from24)}만원</code><br>`;
+  totalhtml += `개정 25년 당기공제: <code>${fmt(from25)}만원</code><br>`;
+  totalhtml += `<strong>합계: <code>`;
+  if (addtl23_2) {
+    totalhtml += `${fmt(from23)} + `;
+  }
+  totalhtml += `${fmt(from24)} + ${fmt(from25)} = ${fmt(grandTotal)}만원</code></strong></div>`;
+
+  document.getElementById('total-content').innerHTML = totalhtml;
 }
 
 // 초기화
