@@ -902,12 +902,7 @@ function isElderlyAtHire(birthDate, hireDate) {
   return getAgeAt(birthDate, hireDate) >= 60;
 }
 
-// 과세연도 기준 고령자 (60세 이상)
-function isElderlyAtYear(birthDate, taxYear) {
-  if (!birthDate) return false;
-  const refDate = new Date(taxYear, 11, 31);
-  return getAgeAt(birthDate, refDate) >= 60;
-}
+// (삭제됨: isElderlyAtYear - 60세 이상은 근로계약체결일 기준만 판단)
 
 function processEmployees(employees, taxYear, corpType) {
   return employees.map(emp => {
@@ -931,14 +926,14 @@ function processEmployees(employees, taxYear, corpType) {
     let youthMonths = 0;
 
     let isYouthYear = false, isYouthHire = false, youthExclude = '';
-    let isDisabled = false, isElderly = false;
+    let isDisabled = false;
     let elderlyAtHire = false;
 
     if (birthDate) {
       isYouthYear = isYouthAtYear(birthDate, taxYear);
       isDisabled = emp.disabled > 0;
       elderlyAtHire = hireDate ? isElderlyAtHire(birthDate, hireDate) : false;
-      isElderly = isElderlyAtYear(birthDate, taxYear);
+
 
       // 2024년 이전 근로계약 체결자: 근로계약체결일 기준 청년여부 미적용
       // → 과세연도 말일(12.31) 기준 나이로 청년 판정, 유지기간(제외시점) 없음
@@ -1022,7 +1017,7 @@ function processEmployees(employees, taxYear, corpType) {
       isYouthHire: isYouthHire ? 'Y' : 'N',
       youthExclude: (isYouthHire && youthExclude) ? youthExclude : '',
       isDisabled: isDisabled ? 'Y' : 'N',
-      isElderly: isElderly ? 'Y' : 'N',
+      isElderly: elderlyAtHire ? 'Y' : 'N',
       elderlyAtHire,
     };
   });
