@@ -227,8 +227,15 @@
             <td id="td-w24-nm"><input type="number" id="w24-normal-metro" step="0.01" value="0" oninput="recalcAll()"></td>
             <td id="td-w24-nl"><input type="number" id="w24-normal-local" step="0.01" value="0" oninput="recalcAll()"></td>
           </tr>
+          <tr id="row-25old" style="background:#f5f0fa;">
+            <td class="label-cell" style="color:#7b2d8b;">2025년 <strong>(종전 기준)</strong><br><span style="font-size:10px;color:#999;">23·24년 추가공제 판단용</span></td>
+            <td><input type="number" id="w25old-youth-metro" step="0.01" value="0" oninput="recalcAll()"></td>
+            <td id="td-w25old-yl"><input type="number" id="w25old-youth-local" step="0.01" value="0" oninput="recalcAll()"></td>
+            <td id="td-w25old-nm"><input type="number" id="w25old-normal-metro" step="0.01" value="0" oninput="recalcAll()"></td>
+            <td id="td-w25old-nl"><input type="number" id="w25old-normal-local" step="0.01" value="0" oninput="recalcAll()"></td>
+          </tr>
           <tr id="row-25">
-            <td class="label-cell">2025년 (개정 25년 당기)</td>
+            <td class="label-cell" style="color:#1a4fa8;">2025년 <strong>(개정 기준)</strong><br><span style="font-size:10px;color:#999;">25년 당기공제용</span></td>
             <td><input type="number" id="w25-youth-metro" step="0.01" value="0" oninput="recalcAll()"></td>
             <td id="td-w25-yl"><input type="number" id="w25-youth-local" step="0.01" value="0" oninput="recalcAll()"></td>
             <td id="td-w25-nm"><input type="number" id="w25-normal-metro" step="0.01" value="0" oninput="recalcAll()"></td>
@@ -314,11 +321,12 @@ function fmtD(n) { return Number.isInteger(n) ? n.toString() : n.toFixed(2); }
 function getCorpType() { return document.getElementById('corp-type').value; }
 
 function getW(year) {
+  const prefix = 'w' + year;
   return {
-    ym: V('w' + year + '-youth-metro'),
-    yl: V('w' + year + '-youth-local'),
-    nm: V('w' + year + '-normal-metro'),
-    nl: V('w' + year + '-normal-local')
+    ym: V(prefix + '-youth-metro'),
+    yl: V(prefix + '-youth-local'),
+    nm: V(prefix + '-normal-metro'),
+    nl: V(prefix + '-normal-local')
   };
 }
 
@@ -562,7 +570,7 @@ function updateLayout() {
     nmHdr.textContent = isSmall ? '수도권' : '전 체';
   }
 
-  [22, 23, 24, 25].forEach(yr => {
+  [22, 23, 24, '25old', 25].forEach(yr => {
     const ylTd = document.getElementById('td-w' + yr + '-yl');
     const nmTd = document.getElementById('td-w' + yr + '-nm');
     const nlTd = document.getElementById('td-w' + yr + '-nl');
@@ -581,7 +589,9 @@ function recalcAll() {
   const corp = getCorpType();
   const maxYears = RATES[corp].years;
 
-  const w22 = getW(22), w23 = getW(23), w24 = getW(24), w25 = getW(25);
+  const w22 = getW(22), w23 = getW(23), w24 = getW(24);
+  const w25old = getW('25old'); // 종전 기준 (23·24년 추가공제 판단용)
+  const w25 = getW(25);         // 개정 기준 (25년 당기공제용)
 
   // ── 구버전 23년 당기 (23 vs 22) ──
   const diff23 = diffW(w23, w22);
@@ -589,14 +599,14 @@ function recalcAll() {
 
   // 1차 추가공제 (24년 vs 22년)
   const addtl23_1 = calcAddtl(corp, diff23, w24, w22);
-  // 2차 추가공제 (25년 vs 22년) — 중소/중견만
-  const addtl23_2 = (maxYears >= 3) ? calcAddtl(corp, diff23, w25, w22) : null;
+  // 2차 추가공제 (25년 종전기준 vs 22년) — 중소/중견만
+  const addtl23_2 = (maxYears >= 3) ? calcAddtl(corp, diff23, w25old, w22) : null;
 
   let o23html = '';
   o23html += formulaDanggi('당기공제 계산 (23년 vs 22년)', danggi23, corp);
   o23html += formulaAddtl('1차 추가공제 유지확인 (24년 근로자수 vs 22년 전기)', diff23, addtl23_1, corp);
   if (addtl23_2) {
-    o23html += formulaAddtl('2차 추가공제 유지확인 (25년 근로자수 vs 22년 전기)', diff23, addtl23_2, corp);
+    o23html += formulaAddtl('2차 추가공제 유지확인 (25년 <u>종전기준</u> 근로자수 vs 22년 전기)', diff23, addtl23_2, corp);
   }
   o23html += '<div class="result-box"><div style="font-size:12px;font-weight:700;margin-bottom:10px;">2023년 당기 공제 결과</div><div class="result-grid">';
   o23html += resultCard('23년 당기공제', danggi23.total, '이미 공제 완료', 'blue');
@@ -613,12 +623,12 @@ function recalcAll() {
   const diff24 = diffW(w24, w23);
   const danggi24 = calcDanggi(corp, diff24);
 
-  // 1차 추가공제 (25년 vs 23년)
-  const addtl24_1 = calcAddtl(corp, diff24, w25, w23);
+  // 1차 추가공제 (25년 종전기준 vs 23년)
+  const addtl24_1 = calcAddtl(corp, diff24, w25old, w23);
 
   let o24html = '';
   o24html += formulaDanggi('당기공제 계산 (24년 vs 23년)', danggi24, corp);
-  o24html += formulaAddtl('1차 추가공제 유지확인 (25년 근로자수 vs 23년 전기)', diff24, addtl24_1, corp);
+  o24html += formulaAddtl('1차 추가공제 유지확인 (25년 <u>종전기준</u> 근로자수 vs 23년 전기)', diff24, addtl24_1, corp);
   o24html += '<div class="result-box"><div style="font-size:12px;font-weight:700;margin-bottom:10px;">2024년 당기 공제 결과</div><div class="result-grid">';
   o24html += resultCard('24년 당기공제', danggi24.total, '이미 공제 완료', 'blue');
   o24html += resultCard('25년 1차 추가공제', addtl24_1.total, addtlSub(danggi24.total, addtl24_1.total), 'green');
@@ -689,12 +699,12 @@ function recalcAll() {
   const diff24_orig = diffW(w24, w23);
   const isTD = (s) => s.type === 'total_case1' || s.type === 'total_case2';
 
-  // 23년 당기 사후관리 (최초: w23)
+  // 23년 당기 사후관리 (최초: w23) — 25년은 종전기준으로 판단
   const sahu23_2 = sahuCheck(corp, w23, w24);
-  const sahu23_3 = (maxYears >= 3) ? sahuCheck(corp, w23, w25) : null;
+  const sahu23_3 = (maxYears >= 3) ? sahuCheck(corp, w23, w25old) : null;
 
-  // 24년 당기 사후관리 (최초: w24)
-  const sahu24_2 = sahuCheck(corp, w24, w25);
+  // 24년 당기 사후관리 (최초: w24) — 25년은 종전기준으로 판단
+  const sahu24_2 = sahuCheck(corp, w24, w25old);
 
   // === 23년분 → 2025년 영향 계산 ===
   let s23 = { credit25: 0, chugjing25: 0, label: '', detail: '' };
@@ -715,7 +725,7 @@ function recalcAll() {
   } else if (sahu23_3 && sahu23_3.type === 'youth_only') {
     // Case D/F: 3년차 청년만 감소 → 차액 소급추징
     const netPerYear = danggi23.total - sahu23_3.chugjing;
-    const fs = fromStartCalc(corp, danggi23.total, diff23_orig, w23, w25);
+    const fs = fromStartCalc(corp, danggi23.total, diff23_orig, w23, w25old);
     // 소급추징: 총 = 차액/연 × 총연수, 이미 24년에 추징한 분 차감
     const priorChugjing = (sahu23_2.type === 'youth_only') ? sahu23_2.chugjing * 2 : 0;
     const totalChugjing = sahu23_3.chugjing * maxYears;
@@ -751,7 +761,7 @@ function recalcAll() {
   } else if (sahu24_2.type === 'youth_only') {
     // 2년차 청년만 감소 → 차액추징
     const netPerYear = danggi24.total - sahu24_2.chugjing;
-    const fs = fromStartCalc(corp, danggi24.total, diff24_orig, w24, w25);
+    const fs = fromStartCalc(corp, danggi24.total, diff24_orig, w24, w25old);
     const totalChugjing = sahu24_2.chugjing * 2; // 1+2년차분 소급
     s24.credit25 = Math.max(0, netPerYear);
     s24.chugjing25 = Math.min(totalChugjing, danggi24.total); // 한도 적용
