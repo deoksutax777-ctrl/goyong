@@ -263,6 +263,12 @@
     <div class="panel-body" id="total-content"></div>
   </div>
 
+  <!-- ── 사후관리 분석 ──────────────── -->
+  <div class="panel" style="border-color:#c0392b;">
+    <div class="panel-header" style="background:#c0392b;color:#fff;"><span class="icon">⚠️</span> 사후관리 분석 (추징세액 시뮬레이션)</div>
+    <div class="panel-body" id="sahu-content"></div>
+  </div>
+
 </div>
 
 <footer style="background:#1a2332;color:#8a9bb0;text-align:center;padding:20px 32px;font-size:12px;font-family:var(--font);letter-spacing:.3px;margin-top:8px;">
@@ -431,6 +437,94 @@ function addtlSub(danggiTotal, addtlTotal) {
   return '고용 유지 확인';
 }
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 사후관리 추징 계산
+// 원칙: 청년 감소분은 "처음부터 비청년"으로 소급 전환
+// 결과 = 최종연도 기준 실질 증가분으로 처음부터 계산한 것과 동일
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function sahuCheck(corp, initialW, checkW) {
+  const rate = RATES[corp];
+  const isSmall = (corp === '중소');
+  const yI = initialW.ym + initialW.yl;
+  const yC = checkW.ym + checkW.yl;
+  const tI = yI + initialW.nm + initialW.nl;
+  const tC = yC + checkW.nm + checkW.nl;
+  const yDec = Math.max(0, yI - yC);
+  const tDec = Math.max(0, tI - tC);
+
+  if (tDec <= 0 && yDec <= 0) return { type: 'ok', chugjing: 0, yDec: 0, tDec: 0 };
+
+  if (tDec <= 0 && yDec > 0) {
+    // 경우3: 전체 유지, 청년만 감소 → 차액 추징
+    let c;
+    if (isSmall) {
+      const ymD = Math.max(0, initialW.ym - checkW.ym);
+      const ylD = Math.max(0, initialW.yl - checkW.yl);
+      c = ymD * (rate.youth.metro - rate.normal.metro)
+        + ylD * (rate.youth.local - rate.normal.local);
+    } else {
+      c = yDec * (rate.youth.metro - rate.normal.metro);
+    }
+    return { type: 'youth_only', chugjing: c, yDec, tDec: 0 };
+  }
+
+  // 전체 감소
+  if (yDec >= tDec) {
+    // 경우1: 청년감소 >= 전체감소
+    let c;
+    if (isSmall) {
+      const ymD = Math.max(0, initialW.ym - checkW.ym);
+      const ylD = Math.max(0, initialW.yl - checkW.yl);
+      c = ymD * rate.youth.metro + ylD * rate.youth.local;
+      const leftover = Math.max(0, tDec - yDec);
+      c += leftover * rate.normal.metro;
+    } else {
+      c = yDec * rate.youth.metro + Math.max(0, tDec - yDec) * rate.normal.metro;
+    }
+    return { type: 'total_case1', chugjing: c, yDec, tDec };
+  } else {
+    // 경우2: 청년감소 < 전체감소
+    let c;
+    if (isSmall) {
+      c = tDec * rate.normal.metro;
+    } else {
+      c = tDec * rate.normal.metro;
+    }
+    return { type: 'total_case2', chugjing: c, yDec, tDec };
+  }
+}
+
+function sahuTypeLabel(type) {
+  switch(type) {
+    case 'ok': return '<span style="color:#0e7c61;font-weight:600;">감소 없음</span>';
+    case 'youth_only': return '<span style="color:#e67e22;font-weight:600;">청년만 감소</span>';
+    case 'total_case1': return '<span style="color:#c0392b;font-weight:600;">전체 감소(경우1)</span>';
+    case 'total_case2': return '<span style="color:#c0392b;font-weight:600;">전체 감소(경우2)</span>';
+    default: return '-';
+  }
+}
+
+// "처음부터" 환산: 원래 증가분에서 청년감소분을 비청년으로 전환
+function fromStartCalc(corp, origDanggiTotal, origDiff, initialW, finalW) {
+  const rate = RATES[corp];
+  const isSmall = (corp === '중소');
+  const ymDec = Math.max(0, initialW.ym - finalW.ym);
+  const ylDec = Math.max(0, initialW.yl - finalW.yl);
+
+  // 전환 후 실질 구성
+  const eff = {
+    ym: Math.max(0, origDiff.ym) - ymDec,
+    yl: Math.max(0, origDiff.yl) - ylDec,
+    nm: Math.max(0, origDiff.nm) + ymDec,
+    nl: Math.max(0, origDiff.nl) + ylDec
+  };
+  const perYear = Math.max(0, eff.ym) * rate.youth.metro
+    + Math.max(0, eff.yl) * rate.youth.local
+    + Math.max(0, eff.nm) * rate.normal.metro
+    + Math.max(0, eff.nl) * rate.normal.local;
+  return { eff, perYear };
+}
+
 function resultCard(label, val, sub, type) {
   return `<div class="result-card ${type||''}">
     <div class="rc-label">${label}</div>
@@ -585,6 +679,127 @@ function recalcAll() {
   totalhtml += `${fmt(from24)} + ${fmt(from25)} = ${fmt(grandTotal)}만원</code></strong></div>`;
 
   document.getElementById('total-content').innerHTML = totalhtml;
+
+  // ── 사후관리 분석 ──
+  const diff23_orig = diffW(w23, w22);
+  const diff24_orig = diffW(w24, w23);
+  const diff25_orig = diffW(w25, w24);
+
+  // 23년 당기 사후관리 (최초: w23, 확인: w24/w25)
+  const sahu23_2 = sahuCheck(corp, w23, w24);
+  const sahu23_3 = (maxYears >= 3) ? sahuCheck(corp, w23, w25) : null;
+  const sahu23_final = sahu23_3 || sahu23_2;
+  const fs23 = fromStartCalc(corp, danggi23.total, diff23_orig, w23, sahu23_3 ? w25 : w24);
+  const net23_perYear = danggi23.total - sahu23_final.chugjing;
+  const raw23_total = danggi23.total * maxYears;
+  const chugjing23_total = sahu23_final.chugjing * maxYears;
+  const net23_total = net23_perYear * maxYears;
+
+  // 24년 당기 사후관리 (최초: w24, 확인: w25)
+  const sahu24_2 = sahuCheck(corp, w24, w25);
+  const fs24 = fromStartCalc(corp, danggi24.total, diff24_orig, w24, w25);
+  const net24_perYear = danggi24.total - sahu24_2.chugjing;
+  const raw24_total = danggi24.total * maxYears;
+  const chugjing24_total = sahu24_2.chugjing * maxYears;
+  const net24_total = net24_perYear * maxYears;
+
+  // 25년 당기 (사후관리 대상 아직 없음)
+  const net25_perYear = danggi25.total;
+
+  let sahuhtml = '';
+
+  // ── 사후관리 현황 테이블 ──
+  sahuhtml += '<p style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">';
+  sahuhtml += '각 당기분별 이후 연도에서 청년/전체 감소 여부를 확인하고, "처음부터 비청년이었다면" 원칙으로 추징세액을 계산합니다.';
+  sahuhtml += '</p>';
+
+  sahuhtml += '<table class="calc-table">';
+  sahuhtml += '<thead><tr><th>당기분</th><th>확인연도</th><th>청년감소(명)</th><th>전체감소(명)</th><th>유형</th><th>추징/연(만원)</th></tr></thead>';
+  sahuhtml += '<tbody>';
+
+  sahuhtml += `<tr><td class="label-cell">23년 당기</td><td>24년 (2차)</td>`;
+  sahuhtml += `<td>${fmtD(sahu23_2.yDec)}</td><td>${fmtD(sahu23_2.tDec)}</td>`;
+  sahuhtml += `<td>${sahuTypeLabel(sahu23_2.type)}</td><td class="result">${fmt(sahu23_2.chugjing)}</td></tr>`;
+
+  if (sahu23_3) {
+    sahuhtml += `<tr><td class="label-cell">23년 당기</td><td>25년 (3차)</td>`;
+    sahuhtml += `<td>${fmtD(sahu23_3.yDec)}</td><td>${fmtD(sahu23_3.tDec)}</td>`;
+    sahuhtml += `<td>${sahuTypeLabel(sahu23_3.type)}</td><td class="result">${fmt(sahu23_3.chugjing)}</td></tr>`;
+  }
+
+  sahuhtml += `<tr><td class="label-cell">24년 당기</td><td>25년 (2차)</td>`;
+  sahuhtml += `<td>${fmtD(sahu24_2.yDec)}</td><td>${fmtD(sahu24_2.tDec)}</td>`;
+  sahuhtml += `<td>${sahuTypeLabel(sahu24_2.type)}</td><td class="result">${fmt(sahu24_2.chugjing)}</td></tr>`;
+
+  sahuhtml += `<tr><td class="label-cell">25년 당기</td><td colspan="5" style="color:var(--text-muted);text-align:center;">아직 확인 불가 (미래)</td></tr>`;
+  sahuhtml += '</tbody></table>';
+
+  // ── "처음부터" 검증 ──
+  sahuhtml += '<div class="result-box" style="margin-top:12px;">';
+  sahuhtml += '<div style="font-size:12px;font-weight:700;margin-bottom:10px;">사후관리 후 순공제액 ("처음부터" 원칙 검증)</div>';
+
+  // 23년 당기
+  sahuhtml += '<div class="formula-box">';
+  sahuhtml += '<div class="formula-title" style="color:#2d6a4f;">23년 당기 (3년간)</div>';
+  sahuhtml += `원래 공제/연: <code>${fmt(danggi23.total)}만</code> × ${maxYears}년 = <code>${fmt(raw23_total)}만</code><br>`;
+  if (sahu23_final.chugjing > 0) {
+    sahuhtml += `최종 추징/연: <code>${fmt(sahu23_final.chugjing)}만</code> × ${maxYears}년 = <code>${fmt(chugjing23_total)}만</code><br>`;
+    sahuhtml += `<strong>순공제: <code>${fmt(net23_perYear)}만/년 × ${maxYears} = ${fmt(net23_total)}만</code></strong><br>`;
+    const fsYouth = Math.max(0, fs23.eff.ym) + Math.max(0, fs23.eff.yl);
+    const fsNormal = Math.max(0, fs23.eff.nm) + Math.max(0, fs23.eff.nl);
+    sahuhtml += `<span style="color:#0e7c61;">검증 (처음부터 청년 ${fmtD(fsYouth)}명 + 비청년 ${fmtD(fsNormal)}명): `;
+    sahuhtml += `<code>${fmt(fs23.perYear)}만/년 × ${maxYears} = ${fmt(fs23.perYear * maxYears)}만</code>`;
+    sahuhtml += (Math.abs(net23_total - fs23.perYear * maxYears) < 0.5) ? ' ✓ 일치</span>' : ' ✗ 불일치</span>';
+  } else {
+    sahuhtml += '<span style="color:#0e7c61;">감소 없음 → 추징 없음 ✓</span>';
+  }
+  sahuhtml += '</div>';
+
+  // 24년 당기
+  sahuhtml += '<div class="formula-box">';
+  sahuhtml += '<div class="formula-title" style="color:#7b2d8b;">24년 당기 (확인: 25년까지)</div>';
+  sahuhtml += `원래 공제/연: <code>${fmt(danggi24.total)}만</code><br>`;
+  if (sahu24_2.chugjing > 0) {
+    sahuhtml += `추징/연: <code>${fmt(sahu24_2.chugjing)}만</code><br>`;
+    sahuhtml += `<strong>순공제/연: <code>${fmt(net24_perYear)}만</code></strong><br>`;
+    const fsYouth24 = Math.max(0, fs24.eff.ym) + Math.max(0, fs24.eff.yl);
+    const fsNormal24 = Math.max(0, fs24.eff.nm) + Math.max(0, fs24.eff.nl);
+    sahuhtml += `<span style="color:#0e7c61;">검증 (처음부터 청년 ${fmtD(fsYouth24)}명 + 비청년 ${fmtD(fsNormal24)}명): `;
+    sahuhtml += `<code>${fmt(fs24.perYear)}만/년</code>`;
+    sahuhtml += (Math.abs(net24_perYear - fs24.perYear) < 0.5) ? ' ✓ 일치</span>' : ' ✗ 불일치</span>';
+  } else {
+    sahuhtml += '<span style="color:#0e7c61;">감소 없음 → 추징 없음 ✓</span>';
+  }
+  sahuhtml += '</div>';
+
+  sahuhtml += '</div>';
+
+  // ── 사후관리 반영 2025년 실수령 합계 ──
+  const adjusted_from23 = (sahu23_3 || sahu23_2).type !== 'ok'
+    ? Math.max(0, (addtl23_2 ? addtl23_2.total : 0) - sahu23_final.chugjing)
+    : (addtl23_2 ? addtl23_2.total : 0);
+  const adjusted_from24 = sahu24_2.type !== 'ok'
+    ? Math.max(0, addtl24_1.total - sahu24_2.chugjing)
+    : addtl24_1.total;
+  const adjusted_from25 = danggi25.total;
+  const adjustedGrand = adjusted_from23 + adjusted_from24 + adjusted_from25;
+
+  sahuhtml += '<div class="result-grid" style="margin-top:12px;">';
+  if (addtl23_2) {
+    sahuhtml += resultCard('23년분 2차추가 (추징 후)', adjusted_from23,
+      sahu23_final.chugjing > 0 ? `추징 ${fmt(sahu23_final.chugjing)}만 차감` : '추징 없음',
+      adjusted_from23 > 0 ? 'green' : '');
+  }
+  sahuhtml += resultCard('24년분 1차추가 (추징 후)', adjusted_from24,
+    sahu24_2.chugjing > 0 ? `추징 ${fmt(sahu24_2.chugjing)}만 차감` : '추징 없음',
+    adjusted_from24 > 0 ? 'green' : '');
+  sahuhtml += resultCard('25년 당기공제', adjusted_from25, '추징 대상 아님', adjusted_from25 > 0 ? 'blue' : '');
+  sahuhtml += resultCard('2025년 실수령 합계', adjustedGrand,
+    grandTotal !== adjustedGrand ? `추징 전 ${fmt(grandTotal)}만` : '추징 없음',
+    'highlight');
+  sahuhtml += '</div>';
+
+  document.getElementById('sahu-content').innerHTML = sahuhtml;
 }
 
 // 초기화
