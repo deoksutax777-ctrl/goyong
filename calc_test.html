@@ -681,122 +681,171 @@ function recalcAll() {
   document.getElementById('total-content').innerHTML = totalhtml;
 
   // ── 사후관리 분석 ──
+  // 원칙1: 전체감소 = 즉시 중단 + 전액몰수 (회복 불가)
+  // 원칙2: 청년만 감소(전체유지) = "처음부터 비청년" 차액 소급추징
+  // 한도: 2년차 = 직전1년(1년차 당기), 3년차 = 직전2년(1+2년차)
+
   const diff23_orig = diffW(w23, w22);
   const diff24_orig = diffW(w24, w23);
-  const diff25_orig = diffW(w25, w24);
+  const isTD = (s) => s.type === 'total_case1' || s.type === 'total_case2';
 
-  // 23년 당기 사후관리 (최초: w23, 확인: w24/w25)
+  // 23년 당기 사후관리 (최초: w23)
   const sahu23_2 = sahuCheck(corp, w23, w24);
   const sahu23_3 = (maxYears >= 3) ? sahuCheck(corp, w23, w25) : null;
-  const sahu23_final = sahu23_3 || sahu23_2;
-  const fs23 = fromStartCalc(corp, danggi23.total, diff23_orig, w23, sahu23_3 ? w25 : w24);
-  const net23_perYear = danggi23.total - sahu23_final.chugjing;
-  const raw23_total = danggi23.total * maxYears;
-  const chugjing23_total = sahu23_final.chugjing * maxYears;
-  const net23_total = net23_perYear * maxYears;
 
-  // 24년 당기 사후관리 (최초: w24, 확인: w25)
+  // 24년 당기 사후관리 (최초: w24)
   const sahu24_2 = sahuCheck(corp, w24, w25);
-  const fs24 = fromStartCalc(corp, danggi24.total, diff24_orig, w24, w25);
-  const net24_perYear = danggi24.total - sahu24_2.chugjing;
-  const raw24_total = danggi24.total * maxYears;
-  const chugjing24_total = sahu24_2.chugjing * maxYears;
-  const net24_total = net24_perYear * maxYears;
 
-  // 25년 당기 (사후관리 대상 아직 없음)
-  const net25_perYear = danggi25.total;
+  // === 23년분 → 2025년 영향 계산 ===
+  let s23 = { credit25: 0, chugjing25: 0, label: '', detail: '' };
 
+  if (isTD(sahu23_2)) {
+    // Case A: 2년차(24년) 전체감소 → 즉시 중단
+    s23.credit25 = 0;
+    s23.chugjing25 = 0; // 추징은 24년에 이미 발생
+    s23.label = '24년 전체감소 → 규정 즉시 중단';
+    s23.detail = `24년에 1년차 당기 전액추징 완료 (${fmt(danggi23.total)}만)`;
+  } else if (sahu23_3 && isTD(sahu23_3)) {
+    // Case B: 2년차 유지, 3년차(25년) 전체감소 → 전액몰수
+    const limit = danggi23.total + addtl23_1.total;
+    s23.credit25 = 0;
+    s23.chugjing25 = limit;
+    s23.label = '25년 전체감소 → 전액몰수';
+    s23.detail = `추징 한도(직전2년): ${fmt(danggi23.total)} + ${fmt(addtl23_1.total)} = ${fmt(limit)}만`;
+  } else if (sahu23_3 && sahu23_3.type === 'youth_only') {
+    // Case D/F: 3년차 청년만 감소 → 차액 소급추징
+    const netPerYear = danggi23.total - sahu23_3.chugjing;
+    const fs = fromStartCalc(corp, danggi23.total, diff23_orig, w23, w25);
+    // 소급추징: 총 = 차액/연 × 총연수, 이미 24년에 추징한 분 차감
+    const priorChugjing = (sahu23_2.type === 'youth_only') ? sahu23_2.chugjing * 2 : 0;
+    const totalChugjing = sahu23_3.chugjing * maxYears;
+    s23.credit25 = Math.max(0, netPerYear);
+    s23.chugjing25 = Math.max(0, totalChugjing - priorChugjing);
+    s23.label = '청년감소 → 차액 소급추징';
+    const fsY = Math.max(0, fs.eff.ym) + Math.max(0, fs.eff.yl);
+    const fsN = Math.max(0, fs.eff.nm) + Math.max(0, fs.eff.nl);
+    s23.detail = `"처음부터" 청년${fmtD(fsY)}+비청년${fmtD(fsN)} → 순공제 ${fmt(netPerYear)}만/연 × ${maxYears}년 = ${fmt(netPerYear * maxYears)}만`;
+    s23.fs = fs;
+  } else if (sahu23_2.type === 'youth_only') {
+    // 2년차 청년감소, 3년차 유지/회복
+    s23.credit25 = addtl23_2 ? addtl23_2.total : 0;
+    s23.chugjing25 = 0;
+    s23.label = '24년 청년감소(처리됨), 25년 유지';
+    s23.detail = '24년에 차액추징 완료, 25년 추가공제 정상 적용';
+  } else {
+    s23.credit25 = addtl23_2 ? addtl23_2.total : 0;
+    s23.chugjing25 = 0;
+    s23.label = '감소 없음';
+    s23.detail = '정상 추가공제 적용';
+  }
+
+  // === 24년분 → 2025년 영향 계산 ===
+  let s24 = { credit25: 0, chugjing25: 0, label: '', detail: '' };
+
+  if (isTD(sahu24_2)) {
+    // 2년차(25년) 전체감소 → 전액몰수
+    s24.credit25 = 0;
+    s24.chugjing25 = danggi24.total; // 한도=직전1년=1년차 당기
+    s24.label = '25년 전체감소 → 전액몰수';
+    s24.detail = `추징 한도(직전1년): ${fmt(danggi24.total)}만`;
+  } else if (sahu24_2.type === 'youth_only') {
+    // 2년차 청년만 감소 → 차액추징
+    const netPerYear = danggi24.total - sahu24_2.chugjing;
+    const fs = fromStartCalc(corp, danggi24.total, diff24_orig, w24, w25);
+    const totalChugjing = sahu24_2.chugjing * 2; // 1+2년차분 소급
+    s24.credit25 = Math.max(0, netPerYear);
+    s24.chugjing25 = Math.min(totalChugjing, danggi24.total); // 한도 적용
+    s24.label = '25년 청년감소 → 차액추징';
+    const fsY = Math.max(0, fs.eff.ym) + Math.max(0, fs.eff.yl);
+    const fsN = Math.max(0, fs.eff.nm) + Math.max(0, fs.eff.nl);
+    s24.detail = `"처음부터" 청년${fmtD(fsY)}+비청년${fmtD(fsN)} → 순공제 ${fmt(netPerYear)}만/연`;
+    s24.fs = fs;
+  } else {
+    s24.credit25 = addtl24_1.total;
+    s24.chugjing25 = 0;
+    s24.label = '감소 없음';
+    s24.detail = '정상 추가공제 적용';
+  }
+
+  // 25년 당기는 사후관리 대상 아님
+  const s25_credit = danggi25.total;
+
+  // 2025년 실수령
+  const adjustedGrand = s23.credit25 + s24.credit25 + s25_credit - s23.chugjing25 - s24.chugjing25;
+
+  // ── 사후관리 패널 렌더링 ──
   let sahuhtml = '';
-
-  // ── 사후관리 현황 테이블 ──
   sahuhtml += '<p style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">';
-  sahuhtml += '각 당기분별 이후 연도에서 청년/전체 감소 여부를 확인하고, "처음부터 비청년이었다면" 원칙으로 추징세액을 계산합니다.';
+  sahuhtml += '전체감소 = 즉시 중단 + 전액몰수 (회복 불가) | 청년만 감소 = "처음부터 비청년" 차액 소급추징';
   sahuhtml += '</p>';
 
+  // 현황 테이블
   sahuhtml += '<table class="calc-table">';
-  sahuhtml += '<thead><tr><th>당기분</th><th>확인연도</th><th>청년감소(명)</th><th>전체감소(명)</th><th>유형</th><th>추징/연(만원)</th></tr></thead>';
+  sahuhtml += '<thead><tr><th>당기분</th><th>확인연도</th><th>청년감소</th><th>전체감소</th><th>유형</th><th>판정</th></tr></thead>';
   sahuhtml += '<tbody>';
 
   sahuhtml += `<tr><td class="label-cell">23년 당기</td><td>24년 (2차)</td>`;
   sahuhtml += `<td>${fmtD(sahu23_2.yDec)}</td><td>${fmtD(sahu23_2.tDec)}</td>`;
-  sahuhtml += `<td>${sahuTypeLabel(sahu23_2.type)}</td><td class="result">${fmt(sahu23_2.chugjing)}</td></tr>`;
+  sahuhtml += `<td>${sahuTypeLabel(sahu23_2.type)}</td>`;
+  sahuhtml += `<td>${isTD(sahu23_2) ? '<strong style="color:#c0392b;">전액몰수</strong>' : sahu23_2.type === 'youth_only' ? '차액추징' : '<span style="color:#0e7c61;">정상</span>'}</td></tr>`;
 
   if (sahu23_3) {
-    sahuhtml += `<tr><td class="label-cell">23년 당기</td><td>25년 (3차)</td>`;
-    sahuhtml += `<td>${fmtD(sahu23_3.yDec)}</td><td>${fmtD(sahu23_3.tDec)}</td>`;
-    sahuhtml += `<td>${sahuTypeLabel(sahu23_3.type)}</td><td class="result">${fmt(sahu23_3.chugjing)}</td></tr>`;
+    const yr3disabled = isTD(sahu23_2);
+    sahuhtml += `<tr style="${yr3disabled ? 'opacity:0.4;' : ''}"><td class="label-cell">23년 당기</td><td>25년 (3차)</td>`;
+    if (yr3disabled) {
+      sahuhtml += `<td colspan="4" style="text-align:center;color:var(--text-muted);">24년에 이미 즉시 중단됨</td></tr>`;
+    } else {
+      sahuhtml += `<td>${fmtD(sahu23_3.yDec)}</td><td>${fmtD(sahu23_3.tDec)}</td>`;
+      sahuhtml += `<td>${sahuTypeLabel(sahu23_3.type)}</td>`;
+      sahuhtml += `<td>${isTD(sahu23_3) ? '<strong style="color:#c0392b;">전액몰수</strong>' : sahu23_3.type === 'youth_only' ? '차액추징' : '<span style="color:#0e7c61;">정상</span>'}</td></tr>`;
+    }
   }
 
   sahuhtml += `<tr><td class="label-cell">24년 당기</td><td>25년 (2차)</td>`;
   sahuhtml += `<td>${fmtD(sahu24_2.yDec)}</td><td>${fmtD(sahu24_2.tDec)}</td>`;
-  sahuhtml += `<td>${sahuTypeLabel(sahu24_2.type)}</td><td class="result">${fmt(sahu24_2.chugjing)}</td></tr>`;
+  sahuhtml += `<td>${sahuTypeLabel(sahu24_2.type)}</td>`;
+  sahuhtml += `<td>${isTD(sahu24_2) ? '<strong style="color:#c0392b;">전액몰수</strong>' : sahu24_2.type === 'youth_only' ? '차액추징' : '<span style="color:#0e7c61;">정상</span>'}</td></tr>`;
 
-  sahuhtml += `<tr><td class="label-cell">25년 당기</td><td colspan="5" style="color:var(--text-muted);text-align:center;">아직 확인 불가 (미래)</td></tr>`;
+  sahuhtml += `<tr><td class="label-cell">25년 당기</td><td colspan="5" style="color:var(--text-muted);text-align:center;">사후관리 대상 아님 (미래)</td></tr>`;
   sahuhtml += '</tbody></table>';
 
-  // ── "처음부터" 검증 ──
+  // 상세 분석
   sahuhtml += '<div class="result-box" style="margin-top:12px;">';
-  sahuhtml += '<div style="font-size:12px;font-weight:700;margin-bottom:10px;">사후관리 후 순공제액 ("처음부터" 원칙 검증)</div>';
+  sahuhtml += '<div style="font-size:12px;font-weight:700;margin-bottom:10px;">2025년 사후관리 상세</div>';
 
-  // 23년 당기
+  // 23년분
   sahuhtml += '<div class="formula-box">';
-  sahuhtml += '<div class="formula-title" style="color:#2d6a4f;">23년 당기 (3년간)</div>';
-  sahuhtml += `원래 공제/연: <code>${fmt(danggi23.total)}만</code> × ${maxYears}년 = <code>${fmt(raw23_total)}만</code><br>`;
-  if (sahu23_final.chugjing > 0) {
-    sahuhtml += `최종 추징/연: <code>${fmt(sahu23_final.chugjing)}만</code> × ${maxYears}년 = <code>${fmt(chugjing23_total)}만</code><br>`;
-    sahuhtml += `<strong>순공제: <code>${fmt(net23_perYear)}만/년 × ${maxYears} = ${fmt(net23_total)}만</code></strong><br>`;
-    const fsYouth = Math.max(0, fs23.eff.ym) + Math.max(0, fs23.eff.yl);
-    const fsNormal = Math.max(0, fs23.eff.nm) + Math.max(0, fs23.eff.nl);
-    sahuhtml += `<span style="color:#0e7c61;">검증 (처음부터 청년 ${fmtD(fsYouth)}명 + 비청년 ${fmtD(fsNormal)}명): `;
-    sahuhtml += `<code>${fmt(fs23.perYear)}만/년 × ${maxYears} = ${fmt(fs23.perYear * maxYears)}만</code>`;
-    sahuhtml += (Math.abs(net23_total - fs23.perYear * maxYears) < 0.5) ? ' ✓ 일치</span>' : ' ✗ 불일치</span>';
-  } else {
-    sahuhtml += '<span style="color:#0e7c61;">감소 없음 → 추징 없음 ✓</span>';
+  sahuhtml += `<div class="formula-title" style="color:#2d6a4f;">23년 당기분 → ${s23.label}</div>`;
+  sahuhtml += `${s23.detail}<br>`;
+  if (s23.chugjing25 > 0) {
+    sahuhtml += `<strong style="color:#c0392b;">25년 추징: <code>${fmt(s23.chugjing25)}만</code></strong> | `;
   }
+  sahuhtml += `25년 수령: <code>${fmt(s23.credit25)}만</code>`;
   sahuhtml += '</div>';
 
-  // 24년 당기
+  // 24년분
   sahuhtml += '<div class="formula-box">';
-  sahuhtml += '<div class="formula-title" style="color:#7b2d8b;">24년 당기 (확인: 25년까지)</div>';
-  sahuhtml += `원래 공제/연: <code>${fmt(danggi24.total)}만</code><br>`;
-  if (sahu24_2.chugjing > 0) {
-    sahuhtml += `추징/연: <code>${fmt(sahu24_2.chugjing)}만</code><br>`;
-    sahuhtml += `<strong>순공제/연: <code>${fmt(net24_perYear)}만</code></strong><br>`;
-    const fsYouth24 = Math.max(0, fs24.eff.ym) + Math.max(0, fs24.eff.yl);
-    const fsNormal24 = Math.max(0, fs24.eff.nm) + Math.max(0, fs24.eff.nl);
-    sahuhtml += `<span style="color:#0e7c61;">검증 (처음부터 청년 ${fmtD(fsYouth24)}명 + 비청년 ${fmtD(fsNormal24)}명): `;
-    sahuhtml += `<code>${fmt(fs24.perYear)}만/년</code>`;
-    sahuhtml += (Math.abs(net24_perYear - fs24.perYear) < 0.5) ? ' ✓ 일치</span>' : ' ✗ 불일치</span>';
-  } else {
-    sahuhtml += '<span style="color:#0e7c61;">감소 없음 → 추징 없음 ✓</span>';
+  sahuhtml += `<div class="formula-title" style="color:#7b2d8b;">24년 당기분 → ${s24.label}</div>`;
+  sahuhtml += `${s24.detail}<br>`;
+  if (s24.chugjing25 > 0) {
+    sahuhtml += `<strong style="color:#c0392b;">25년 추징: <code>${fmt(s24.chugjing25)}만</code></strong> | `;
   }
+  sahuhtml += `25년 수령: <code>${fmt(s24.credit25)}만</code>`;
   sahuhtml += '</div>';
 
   sahuhtml += '</div>';
 
-  // ── 사후관리 반영 2025년 실수령 합계 ──
-  const adjusted_from23 = (sahu23_3 || sahu23_2).type !== 'ok'
-    ? Math.max(0, (addtl23_2 ? addtl23_2.total : 0) - sahu23_final.chugjing)
-    : (addtl23_2 ? addtl23_2.total : 0);
-  const adjusted_from24 = sahu24_2.type !== 'ok'
-    ? Math.max(0, addtl24_1.total - sahu24_2.chugjing)
-    : addtl24_1.total;
-  const adjusted_from25 = danggi25.total;
-  const adjustedGrand = adjusted_from23 + adjusted_from24 + adjusted_from25;
-
+  // 실수령 합계
+  const totalChugjing25 = s23.chugjing25 + s24.chugjing25;
   sahuhtml += '<div class="result-grid" style="margin-top:12px;">';
-  if (addtl23_2) {
-    sahuhtml += resultCard('23년분 2차추가 (추징 후)', adjusted_from23,
-      sahu23_final.chugjing > 0 ? `추징 ${fmt(sahu23_final.chugjing)}만 차감` : '추징 없음',
-      adjusted_from23 > 0 ? 'green' : '');
+  sahuhtml += resultCard('23년분 (25년 수령)', s23.credit25, s23.label, s23.credit25 > 0 ? 'green' : '');
+  sahuhtml += resultCard('24년분 (25년 수령)', s24.credit25, s24.label, s24.credit25 > 0 ? 'green' : '');
+  sahuhtml += resultCard('25년 당기공제', s25_credit, '사후관리 무관', s25_credit > 0 ? 'blue' : '');
+  if (totalChugjing25 > 0) {
+    sahuhtml += resultCard('25년 추징 합계', -totalChugjing25, '기존 공제분 환수', '');
   }
-  sahuhtml += resultCard('24년분 1차추가 (추징 후)', adjusted_from24,
-    sahu24_2.chugjing > 0 ? `추징 ${fmt(sahu24_2.chugjing)}만 차감` : '추징 없음',
-    adjusted_from24 > 0 ? 'green' : '');
-  sahuhtml += resultCard('25년 당기공제', adjusted_from25, '추징 대상 아님', adjusted_from25 > 0 ? 'blue' : '');
   sahuhtml += resultCard('2025년 실수령 합계', adjustedGrand,
-    grandTotal !== adjustedGrand ? `추징 전 ${fmt(grandTotal)}만` : '추징 없음',
-    'highlight');
+    grandTotal !== adjustedGrand ? `추징 전 ${fmt(grandTotal)}만` : '추징 없음', 'highlight');
   sahuhtml += '</div>';
 
   document.getElementById('sahu-content').innerHTML = sahuhtml;
