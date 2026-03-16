@@ -585,20 +585,50 @@ function renderTimelines(all) {
 
     // 산식 + 검증
     if (hasAnyCredit) {
+      const rt = RATES[corp], isS = (corp==='중소'), hasN = (corp!=='대기업');
       h += '<div class="tl-formulas">';
+
+      // 단가 표시
+      h += '<div class="f-title">적용 단가</div>';
+      if (isS) {
+        h += `청년: 수도권 <code>${fmt(rt.youth.metro)}만</code> / 비수도권 <code>${fmt(rt.youth.local)}만</code>`;
+        if (hasN) h += ` | 비청년: 수도권 <code>${fmt(rt.normal.metro)}만</code> / 비수도권 <code>${fmt(rt.normal.local)}만</code>`;
+      } else {
+        h += `청년: <code>${fmt(rt.youth.metro)}만</code>`;
+        if (hasN) h += ` | 비청년: <code>${fmt(rt.normal.metro)}만</code>`;
+      }
+      h += '<br><br>';
+
       h += '<div class="f-title">산식</div>';
 
       // 당기 산식
-      const yI = danggi.inc.ym+danggi.inc.yl, nI = danggi.inc.nm+danggi.inc.nl;
-      h += `당기(${startY}): 청년+${fmtD(yI)}명 × 청년단가 + 비청년+${fmtD(nI)}명 × 비청년단가 = <code>${fmt(danggi.total)}만</code><br>`;
+      if (isS) {
+        h += `당기(${startY}): `;
+        h += `청년 수도권+${fmtD(danggi.inc.ym)}×${fmt(rt.youth.metro)} + 비수도권+${fmtD(danggi.inc.yl)}×${fmt(rt.youth.local)}`;
+        if (hasN) h += ` + 비청년 수도권+${fmtD(danggi.inc.nm)}×${fmt(rt.normal.metro)} + 비수도권+${fmtD(danggi.inc.nl)}×${fmt(rt.normal.local)}`;
+        h += ` = <code>${fmt(danggi.total)}만</code><br>`;
+      } else {
+        const yI = danggi.inc.ym+danggi.inc.yl, nI = danggi.inc.nm+danggi.inc.nl;
+        h += `당기(${startY}): 청년+${fmtD(yI)}×${fmt(rt.youth.metro)}`;
+        if (hasN) h += ` + 비청년+${fmtD(nI)}×${fmt(rt.normal.metro)}`;
+        h += ` = <code>${fmt(danggi.total)}만</code><br>`;
+      }
 
       // 추가공제 산식
       tl.forEach(item => {
         if (!item.hasData || item.role==='전기' || item.role==='당기') return;
         h += `${item.role}(${item.year}): `;
         if (item.addtl) {
-          const kY = item.addtl.inc.ym+item.addtl.inc.yl, kN = item.addtl.inc.nm+item.addtl.inc.nl;
-          h += `유지확인 MIN(당기증가, ${item.year}-전기) → 청년${fmtD(kY)}+비청년${fmtD(kN)} = <code>${fmt(item.credit)}만</code>`;
+          if (isS) {
+            h += `유지 → 청년 수도권${fmtD(item.addtl.inc.ym)}×${fmt(rt.youth.metro)} + 비수도권${fmtD(item.addtl.inc.yl)}×${fmt(rt.youth.local)}`;
+            if (hasN) h += ` + 비청년 수도권${fmtD(item.addtl.inc.nm)}×${fmt(rt.normal.metro)} + 비수도권${fmtD(item.addtl.inc.nl)}×${fmt(rt.normal.local)}`;
+            h += ` = <code>${fmt(item.credit)}만</code>`;
+          } else {
+            const kY = item.addtl.inc.ym+item.addtl.inc.yl, kN = item.addtl.inc.nm+item.addtl.inc.nl;
+            h += `유지 → 청년${fmtD(kY)}×${fmt(rt.youth.metro)}`;
+            if (hasN) h += ` + 비청년${fmtD(kN)}×${fmt(rt.normal.metro)}`;
+            h += ` = <code>${fmt(item.credit)}만</code>`;
+          }
         }
         if (item.sahu && item.sahu.type!=='ok') {
           h += ` | 사후관리(${item.sahu.type}): 산출<code>${fmt(item.sahu.raw)}만</code>`;
