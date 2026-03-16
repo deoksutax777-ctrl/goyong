@@ -209,7 +209,10 @@
   <div id="timelines-area"></div>
 
   <div class="panel">
-    <div class="panel-header" style="background:var(--accent);color:#fff;">&#128200; 연도별 세액공제 종합</div>
+    <div class="panel-header" style="background:var(--accent);color:#fff;justify-content:space-between;">
+      <span>&#128200; 연도별 세액공제 종합</span>
+      <button id="axis-toggle" onclick="toggleAxis()" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:5px;padding:4px 12px;font-size:11px;font-weight:600;cursor:pointer;">축 전환</button>
+    </div>
     <div class="panel-body" id="summary-area"></div>
   </div>
 
@@ -233,6 +236,7 @@ const RATES = {
 };
 
 let saved = {};
+let axisFlipped = false;
 
 function fmt(n) { return n.toLocaleString('ko-KR'); }
 function fmtD(n) { return Number.isInteger(n) ? n.toString() : n.toFixed(2); }
@@ -500,8 +504,17 @@ function renderTimelines(all) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 종합 매트릭스
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+let lastAll, lastFrom, lastTo;
+
+function toggleAxis() {
+  axisFlipped = !axisFlipped;
+  document.getElementById('axis-toggle').textContent = axisFlipped ? '행=시작연도 | 축 전환' : '행=과세연도 | 축 전환';
+  if (lastAll) renderSummary(lastAll, lastFrom, lastTo);
+}
+
 function renderSummary(all, from, to) {
-  // Collect data: matrix[calendarYear][startYear] = { credit, chugjing }
+  lastAll=all; lastFrom=from; lastTo=to;
+
   const matrix = {};
   const startYears = all.map(a => a.startY);
   const calYearSet = new Set();
@@ -516,55 +529,66 @@ function renderSummary(all, from, to) {
   });
 
   const calYears = [...calYearSet].sort();
+  let h, grandCredit=0, grandChug=0;
 
-  let h = '<table class="matrix"><thead><tr>';
-  h += '<th>연도</th>';
-  startYears.forEach(sy => h += `<th>${sy}년 시작</th>`);
-  h += '<th>연 합계</th></tr></thead><tbody>';
+  if (!axisFlipped) {
+    // 기본: 행=과세연도, 열=시작연도
+    h = '<table class="matrix"><thead><tr>';
+    h += '<th>과세연도 \\ 시작</th>';
+    startYears.forEach(sy => h += `<th>${sy}년</th>`);
+    h += '<th>연 합계</th></tr></thead><tbody>';
 
-  const colCredit = {}, colChug = {};
-  startYears.forEach(sy => { colCredit[sy]=0; colChug[sy]=0; });
-  let grandCredit=0, grandChug=0;
+    const colC={}, colCh={}; startYears.forEach(sy=>{colC[sy]=0;colCh[sy]=0;});
 
-  calYears.forEach(cy => {
-    h += '<tr>';
-    h += `<td class="lbl"><strong>${cy}년</strong></td>`;
-    let rowC=0, rowCh=0;
-
-    startYears.forEach(sy => {
-      const d = matrix[cy] && matrix[cy][sy];
-      if (d) {
-        const net = d.credit - d.chugjing;
-        colCredit[sy]+=d.credit; colChug[sy]+=d.chugjing;
-        rowC+=d.credit; rowCh+=d.chugjing;
-        h += '<td>';
-        if (d.credit>0) h += `<div class="cell-credit">${fmt(d.credit)}</div>`;
-        else h += '<div style="color:#ccc;">0</div>';
-        if (d.chugjing>0) h += `<div class="cell-chug">(-${fmt(d.chugjing)})</div>`;
-        h += '</td>';
-      } else {
-        h += '<td></td>';
-      }
+    calYears.forEach(cy => {
+      h+='<tr>'; h+=`<td class="lbl"><strong>${cy}년</strong></td>`;
+      let rowC=0, rowCh=0;
+      startYears.forEach(sy => {
+        const d=matrix[cy]&&matrix[cy][sy];
+        if(d){colC[sy]+=d.credit;colCh[sy]+=d.chugjing;rowC+=d.credit;rowCh+=d.chugjing;
+          h+='<td>'; if(d.credit>0) h+=`<div class="cell-credit">${fmt(d.credit)}</div>`; else h+='<div style="color:#ccc;">0</div>';
+          if(d.chugjing>0) h+=`<div class="cell-chug">(-${fmt(d.chugjing)})</div>`; h+='</td>';
+        } else h+='<td></td>';
+      });
+      grandCredit+=rowC; grandChug+=rowCh;
+      h+=`<td class="col-total">${fmt(rowC-rowCh)}`;
+      if(rowCh>0) h+=`<div class="cell-chug">(-${fmt(rowCh)})</div>`; h+='</td></tr>';
     });
 
-    grandCredit+=rowC; grandChug+=rowCh;
-    const rowNet = rowC - rowCh;
-    h += `<td class="col-total">${fmt(rowNet)}`;
-    if (rowCh>0) h += `<div class="cell-chug">(-${fmt(rowCh)})</div>`;
-    h += '</td></tr>';
-  });
+    h+='<tr class="row-total"><td class="lbl">합계</td>';
+    startYears.forEach(sy=>{const n=colC[sy]-colCh[sy]; h+=`<td>${fmt(n)}`;
+      if(colCh[sy]>0) h+=`<br><span style="font-size:11px;opacity:.8;">(-${fmt(colCh[sy])})</span>`; h+='</td>';});
+    const gn=grandCredit-grandChug; h+=`<td>${fmt(gn)}</td></tr></tbody></table>`;
 
-  // Totals row
-  h += '<tr class="row-total"><td class="lbl">합계</td>';
-  startYears.forEach(sy => {
-    const net = colCredit[sy]-colChug[sy];
-    h += `<td>${fmt(net)}`;
-    if (colChug[sy]>0) h += `<br><span style="font-size:11px;opacity:.8;">(-${fmt(colChug[sy])})</span>`;
-    h += '</td>';
-  });
-  const grandNet = grandCredit-grandChug;
-  h += `<td>${fmt(grandNet)}</td></tr>`;
-  h += '</tbody></table>';
+  } else {
+    // 전환: 행=시작연도, 열=과세연도
+    h = '<table class="matrix"><thead><tr>';
+    h += '<th>시작 \\ 과세연도</th>';
+    calYears.forEach(cy => h += `<th>${cy}년</th>`);
+    h += '<th>합계</th></tr></thead><tbody>';
+
+    const colC={}, colCh={}; calYears.forEach(cy=>{colC[cy]=0;colCh[cy]=0;});
+
+    startYears.forEach(sy => {
+      h+='<tr>'; h+=`<td class="lbl"><strong>${sy}년 시작</strong></td>`;
+      let rowC=0, rowCh=0;
+      calYears.forEach(cy => {
+        const d=matrix[cy]&&matrix[cy][sy];
+        if(d){colC[cy]+=d.credit;colCh[cy]+=d.chugjing;rowC+=d.credit;rowCh+=d.chugjing;
+          h+='<td>'; if(d.credit>0) h+=`<div class="cell-credit">${fmt(d.credit)}</div>`; else h+='<div style="color:#ccc;">0</div>';
+          if(d.chugjing>0) h+=`<div class="cell-chug">(-${fmt(d.chugjing)})</div>`; h+='</td>';
+        } else h+='<td></td>';
+      });
+      grandCredit+=rowC; grandChug+=rowCh;
+      h+=`<td class="col-total">${fmt(rowC-rowCh)}`;
+      if(rowCh>0) h+=`<div class="cell-chug">(-${fmt(rowCh)})</div>`; h+='</td></tr>';
+    });
+
+    h+='<tr class="row-total"><td class="lbl">합계</td>';
+    calYears.forEach(cy=>{const n=colC[cy]-colCh[cy]; h+=`<td>${fmt(n)}`;
+      if(colCh[cy]>0) h+=`<br><span style="font-size:11px;opacity:.8;">(-${fmt(colCh[cy])})</span>`; h+='</td>';});
+    const gn=grandCredit-grandChug; h+=`<td>${fmt(gn)}</td></tr></tbody></table>`;
+  }
 
   // Highlight
   h += '<div class="highlight-box">';
