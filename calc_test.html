@@ -376,53 +376,81 @@ function calcAddtl(corp, danggiInc, wCheck, wPrev) {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 사후관리 체크 (당기연도 vs 확인연도)
+// 사후관리 추징 계산 (조특법 제29조의8 시행령)
+// CASE A (가.㉠): 전체감소 + 청년감소≥전체감소
+// CASE B (가.㉡): 전체감소 + 청년감소<전체감소
+// CASE C (나.):   전체유지 + 청년만감소
+// CASE D:         추징없음
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function sahuCheck(corp, wDanggi, wCheck) {
+
+// 단일 지역 추징 기본금액 (multiplier 적용 전)
+function calcRegionRaw(yRate, nRate, yDanggi, nDanggi, yChk, nChk, yDanggiInc) {
+  const yDec = Math.max(0, yDanggi - yChk);
+  const nDec = Math.max(0, nDanggi - nChk);
+  const tDec = Math.max(0, (yDanggi + nDanggi) - (yChk + nChk));
+
+  if (tDec <= 0 && yDec <= 0) return 0;
+
+  // 나. CASE C: 전체 유지 + 청년만 감소
+  if (tDec <= 0 && yDec > 0) {
+    return Math.min(yDec, yDanggiInc) * (yRate - nRate);
+  }
+
+  // 가.㉠ CASE A: 청년감소 ≥ 전체감소
+  if (yDec >= tDec) {
+    const effYDec = Math.min(yDec, yDanggiInc); // 한도: 당기 청년증가
+    const converted = Math.max(0, effYDec - tDec); // 전환분
+    return converted * (yRate - nRate) + tDec * yRate;
+  }
+
+  // 가.㉡ CASE B: 청년감소 < 전체감소
+  return Math.min(yDec, tDec) * yRate + Math.min(nDec, tDec) * nRate;
+}
+
+// 전체 추징 계산 (multiplier: 2차=1, 3차=공제횟수)
+function sahuCheck(corp, wDanggi, wCheck, danggiInc, multiplier) {
   const rate = RATES[corp];
   const isSmall = (corp === '중소');
-  const yD = youthW(wDanggi), yC = youthW(wCheck);
-  const tD = totalW(wDanggi), tC = totalW(wCheck);
-  const yDec = Math.max(0, yD - yC);
-  const tDec = Math.max(0, tD - tC);
 
-  if (tDec <= 0 && yDec <= 0) return { type: 'ok', chugjing: 0, yDec: 0, tDec: 0 };
+  const yDec = Math.max(0, youthW(wDanggi) - youthW(wCheck));
+  const tDec = Math.max(0, totalW(wDanggi) - totalW(wCheck));
 
-  if (tDec <= 0 && yDec > 0) {
-    let c;
+  // type 판정
+  let type = 'ok';
+  if (tDec > 0 && yDec >= tDec) type = 'case_a';
+  else if (tDec > 0) type = 'case_b';
+  else if (yDec > 0) type = 'youth_only';
+
+  let raw = 0;
+  if (type !== 'ok') {
     if (isSmall) {
-      const ymD = Math.max(0, wDanggi.ym - wCheck.ym);
-      const ylD = Math.max(0, wDanggi.yl - wCheck.yl);
-      c = ymD * (rate.youth.metro - rate.normal.metro)
-        + ylD * (rate.youth.local - rate.normal.local);
+      raw = calcRegionRaw(
+        rate.youth.metro, rate.normal.metro,
+        wDanggi.ym, wDanggi.nm, wCheck.ym, wCheck.nm, danggiInc.ym
+      ) + calcRegionRaw(
+        rate.youth.local, rate.normal.local,
+        wDanggi.yl, wDanggi.nl, wCheck.yl, wCheck.nl, danggiInc.yl
+      );
     } else {
-      c = yDec * (rate.youth.metro - rate.normal.metro);
+      raw = calcRegionRaw(
+        rate.youth.metro, rate.normal.metro,
+        youthW(wDanggi), totalW(wDanggi) - youthW(wDanggi),
+        youthW(wCheck), totalW(wCheck) - youthW(wCheck),
+        danggiInc.ym + danggiInc.yl
+      );
     }
-    return { type: 'youth_only', chugjing: c, yDec, tDec: 0 };
+    raw *= multiplier;
   }
 
-  // 전체 감소
-  if (isSmall) {
-    const ymD = Math.max(0, wDanggi.ym - wCheck.ym);
-    const ylD = Math.max(0, wDanggi.yl - wCheck.yl);
-    let c = ymD * rate.youth.metro + ylD * rate.youth.local;
-    const leftover = Math.max(0, tDec - yDec);
-    // 비청년 감소분은 수도권/비수도권 구분 필요
-    const nmD = Math.max(0, wDanggi.nm - wCheck.nm);
-    const nlD = Math.max(0, wDanggi.nl - wCheck.nl);
-    c += nmD * rate.normal.metro + nlD * rate.normal.local;
-    return { type: 'total_dec', chugjing: c, yDec, tDec };
-  } else {
-    let c = yDec * rate.youth.metro + Math.max(0, tDec - yDec) * rate.normal.metro;
-    return { type: 'total_dec', chugjing: c, yDec, tDec };
-  }
+  return { type, raw, yDec, tDec };
 }
 
 function sahuLabel(type) {
   switch(type) {
-    case 'ok': return '<span class="badge badge-ok">정상 유지</span>';
-    case 'youth_only': return '<span class="badge badge-warn">청년만 감소</span>';
-    case 'total_dec': return '<span class="badge badge-danger">감소 (추징)</span>';
+    case 'ok': return '<span class="badge badge-ok">CASE D: 정상 유지</span>';
+    case 'youth_only': return '<span class="badge badge-warn">CASE C (나.): 청년만 감소</span>';
+    case 'case_a': return '<span class="badge badge-danger">CASE A (가.㉠): 전체감소/청년≥전체</span>';
+    case 'case_b': return '<span class="badge badge-danger">CASE B (가.㉡): 전체감소/청년&lt;전체</span>';
     default: return '-';
   }
 }
@@ -537,23 +565,34 @@ function recalc() {
     const checkYear = startYear + i;
     const wCheck = getW(checkYear);
 
-    // 사후관리: 당기연도 vs 확인연도
-    const sahu = sahuCheck(corp, wDanggi, wCheck);
-
     // 추가공제 계산 (유지확인: 확인연도 vs 전기) - 항상 계산
     const addtl = calcAddtl(corp, danggi.inc, wCheck, wPrev);
     const credit = addtl.total;
 
-    // 추징: 감소분만큼만 (전액몰수 아님)
-    let chugjing = 0;
-    if (sahu.type === 'total_dec' || sahu.type === 'youth_only') {
-      chugjing = sahu.chugjing;
+    // 사후관리 추징 계산
+    let sahu, chugjing = 0, limit = 0, multiplier = 1, prevChugjing = 0;
+
+    if (i === 1) {
+      // ① 2차년도: multiplier=1, 한도=직전1년 공제세액
+      multiplier = 1;
+      limit = danggi.total;
+      sahu = sahuCheck(corp, wDanggi, wCheck, danggi.inc, multiplier);
+      chugjing = Math.min(sahu.raw, limit);
+    } else if (i === 2) {
+      // ② 3차년도: multiplier=직전2년 공제횟수, 한도=직전2년 공제세액합계
+      const prevResult = results[results.length - 1];
+      const creditCount = (danggi.total > 0 ? 1 : 0) + (prevResult.credit > 0 ? 1 : 0);
+      multiplier = creditCount;
+      limit = danggi.total + prevResult.credit; // 직전 2년 공제세액 합계
+      prevChugjing = prevResult.chugjing; // ①에서 이미 계산한 금액
+      sahu = sahuCheck(corp, wDanggi, wCheck, danggi.inc, multiplier);
+      chugjing = Math.min(Math.max(0, sahu.raw - prevChugjing), limit);
     }
 
     results.push({
       year: checkYear, role: i + '차 추가공제', roleIdx: i + 1,
       w: wCheck, credit, addtl, sahu, chugjing,
-      addtlIdx: i
+      addtlIdx: i, limit, multiplier, prevChugjing
     });
   }
 
@@ -708,24 +747,52 @@ function renderDetails(results, danggi, corp) {
       }
 
       // 사후관리 상세
-      if (r.sahu && r.sahu.type !== 'ok') {
-        h += '<div class="formula-box" style="border-color:var(--warn);background:#fdf8f6;">';
-        h += `<strong style="color:var(--warn);">사후관리</strong> (${r.year}년 vs ${results[1].year}년 당기)<br><br>`;
-        if (r.sahu.type === 'total_dec') {
-          h += `전체 근로자 감소: <code>${fmtD(r.sahu.tDec)}명</code> (청년 ${fmtD(r.sahu.yDec)}명)<br>`;
-          h += `감소분 × 단가 = <code>${fmt(r.chugjing)}만원</code><br>`;
-          h += `<strong style="color:var(--warn);">→ 감소분 추징: <code>${fmt(r.chugjing)}만원</code></strong>`;
-        } else if (r.sahu.type === 'youth_only') {
-          h += `청년 감소: <code>${fmtD(r.sahu.yDec)}명</code> (전체는 유지)<br>`;
-          h += `차액(청년단가-비청년단가) × 감소인원 = <code>${fmt(r.chugjing)}만원</code><br>`;
-          h += `<strong style="color:var(--warn);">→ 차액 추징: <code>${fmt(r.chugjing)}만원</code></strong>`;
-        }
-        h += '</div>';
-      }
+      if (r.sahu) {
+        const isWarn = r.sahu.type !== 'ok';
+        const borderC = isWarn ? 'var(--warn)' : 'var(--accent2)';
+        const bgC = isWarn ? '#fdf8f6' : '#f0faf6';
+        const titleC = isWarn ? 'var(--warn)' : 'var(--accent2)';
+        const yearLabel = r.addtlIdx === 1 ? '2차년도 ①' : '3차년도 ②';
 
-      if (r.sahu && r.sahu.type === 'ok') {
-        h += '<div class="formula-box" style="border-color:var(--accent2);background:#f0faf6;">';
-        h += `<strong style="color:var(--accent2);">사후관리</strong> (${r.year}년 vs ${results[1].year}년 당기): 감소 없음 - 정상 유지`;
+        h += `<div class="formula-box" style="border-color:${borderC};background:${bgC};">`;
+        h += `<strong style="color:${titleC};">사후관리 [${yearLabel}]</strong> (${r.year}년 vs ${results[1].year}년 당기)<br>`;
+
+        if (r.sahu.type === 'ok') {
+          h += `감소 없음 → <strong style="color:var(--accent2);">CASE D: 추징 없음</strong>`;
+        } else if (r.sahu.type === 'case_a') {
+          const effYDec = Math.min(r.sahu.yDec, youthW(results[1].danggi.inc));
+          const converted = Math.max(0, effYDec - r.sahu.tDec);
+          h += `<br>전체감소: <code>${fmtD(r.sahu.tDec)}명</code>, 청년감소: <code>${fmtD(r.sahu.yDec)}명</code> (청년감소 ≥ 전체감소)<br>`;
+          h += `전환분(청년→비청년): <code>${fmtD(converted)}명</code> × (청년단가-비청년단가)`;
+          if (r.multiplier > 1) h += ` × ${r.multiplier}회`;
+          h += `<br>`;
+          h += `이탈분: <code>${fmtD(r.sahu.tDec)}명</code> × 청년단가`;
+          if (r.multiplier > 1) h += ` × ${r.multiplier}회`;
+          h += `<br>`;
+          h += `산출액: <code>${fmt(r.sahu.raw)}만원</code>`;
+          if (r.prevChugjing > 0) h += ` - ①기공제 ${fmt(r.prevChugjing)}만`;
+          h += ` (한도: ${fmt(r.limit)}만)<br>`;
+          h += `<strong style="color:var(--warn);">→ 추징: <code>${fmt(r.chugjing)}만원</code></strong>`;
+        } else if (r.sahu.type === 'case_b') {
+          const nDec = Math.max(0, r.sahu.tDec - r.sahu.yDec);
+          h += `<br>전체감소: <code>${fmtD(r.sahu.tDec)}명</code>, 청년감소: <code>${fmtD(r.sahu.yDec)}명</code>, 비청년감소: <code>${fmtD(nDec)}명</code><br>`;
+          h += `청년분 × 청년단가 + 비청년분 × 비청년단가`;
+          if (r.multiplier > 1) h += ` × ${r.multiplier}회`;
+          h += `<br>`;
+          h += `산출액: <code>${fmt(r.sahu.raw)}만원</code>`;
+          if (r.prevChugjing > 0) h += ` - ①기공제 ${fmt(r.prevChugjing)}만`;
+          h += ` (한도: ${fmt(r.limit)}만)<br>`;
+          h += `<strong style="color:var(--warn);">→ 추징: <code>${fmt(r.chugjing)}만원</code></strong>`;
+        } else if (r.sahu.type === 'youth_only') {
+          h += `<br>청년감소: <code>${fmtD(r.sahu.yDec)}명</code> (전체는 유지)<br>`;
+          h += `MIN(청년감소, 당기청년증가) × (청년단가 - 비청년단가)`;
+          if (r.multiplier > 1) h += ` × ${r.multiplier}회`;
+          h += `<br>`;
+          h += `산출액: <code>${fmt(r.sahu.raw)}만원</code>`;
+          if (r.prevChugjing > 0) h += ` - ①기공제 ${fmt(r.prevChugjing)}만`;
+          h += ` (한도: ${fmt(r.limit)}만)<br>`;
+          h += `<strong style="color:var(--warn);">→ 추징: <code>${fmt(r.chugjing)}만원</code></strong>`;
+        }
         h += '</div>';
       }
     }
