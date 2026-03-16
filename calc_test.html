@@ -422,7 +422,7 @@ function sahuLabel(type) {
   switch(type) {
     case 'ok': return '<span class="badge badge-ok">정상 유지</span>';
     case 'youth_only': return '<span class="badge badge-warn">청년만 감소</span>';
-    case 'total_dec': return '<span class="badge badge-danger">전체 감소</span>';
+    case 'total_dec': return '<span class="badge badge-danger">감소 (추징)</span>';
     default: return '-';
   }
 }
@@ -520,54 +520,39 @@ function recalc() {
   const danggi = calcDanggi(corp, diff);
 
   // 추가공제 & 사후관리 for each year
-  const results = []; // { year, role, credit, addtl, sahu, chugjing, terminated }
-  let terminated = false;
-  let cumulativeCredit = danggi.total; // 누적 수령액 (추징 한도 계산용)
+  const results = [];
 
   results.push({
     year: prevYear, role: '전기', roleIdx: 0,
-    w: wPrev, credit: 0, addtl: null, sahu: null, chugjing: 0, terminated: false
+    w: wPrev, credit: 0, addtl: null, sahu: null, chugjing: 0
   });
 
   results.push({
     year: startYear, role: '당기공제', roleIdx: 1,
     w: wDanggi, diff: diff, danggi: danggi,
-    credit: danggi.total, addtl: null, sahu: null, chugjing: 0, terminated: false
+    credit: danggi.total, addtl: null, sahu: null, chugjing: 0
   });
 
   for (let i = 1; i < maxYears; i++) {
     const checkYear = startYear + i;
     const wCheck = getW(checkYear);
-    let credit = 0, chugjing = 0, sahu = null, addtl = null;
 
-    if (!terminated) {
-      // 사후관리: 당기연도 vs 확인연도
-      sahu = sahuCheck(corp, wDanggi, wCheck);
+    // 사후관리: 당기연도 vs 확인연도
+    const sahu = sahuCheck(corp, wDanggi, wCheck);
 
-      if (sahu.type === 'total_dec') {
-        // 전체감소 → 즉시중단 + 이전 공제 전액 몰수
-        terminated = true;
-        credit = 0;
-        chugjing = cumulativeCredit;
-      } else {
-        // 추가공제 계산 (유지확인: 확인연도 vs 전기)
-        addtl = calcAddtl(corp, danggi.inc, wCheck, wPrev);
-        credit = addtl.total;
+    // 추가공제 계산 (유지확인: 확인연도 vs 전기) - 항상 계산
+    const addtl = calcAddtl(corp, danggi.inc, wCheck, wPrev);
+    const credit = addtl.total;
 
-        if (sahu.type === 'youth_only') {
-          // 청년만 감소 → 차액 소급추징
-          // 이번 해까지 포함 총 연수 × 차액/연
-          const totalYears = i + 1; // 당기(1) + 추가공제 차수(i)
-          chugjing = sahu.chugjing * totalYears;
-        }
-      }
+    // 추징: 감소분만큼만 (전액몰수 아님)
+    let chugjing = 0;
+    if (sahu.type === 'total_dec' || sahu.type === 'youth_only') {
+      chugjing = sahu.chugjing;
     }
-
-    cumulativeCredit += credit;
 
     results.push({
       year: checkYear, role: i + '차 추가공제', roleIdx: i + 1,
-      w: wCheck, credit, addtl, sahu, chugjing, terminated,
+      w: wCheck, credit, addtl, sahu, chugjing,
       addtlIdx: i
     });
   }
@@ -617,14 +602,10 @@ function renderSummary(results, danggi, corp) {
       h += `<td style="font-weight:700;">${fmt(r.credit)}</td>`;
     } else {
       h += `<td><span class="badge badge-addtl">${r.role}</span></td>`;
-      if (r.terminated && r.credit === 0 && r.chugjing === 0) {
-        h += `<td colspan="4" style="color:var(--text-muted);text-align:center;">이전 연도에서 즉시 중단됨</td>`;
-      } else {
-        h += `<td style="font-weight:700;color:var(--accent2);">${fmt(r.credit)}</td>`;
-        h += `<td>${r.sahu ? sahuLabel(r.sahu.type) : '-'}</td>`;
-        h += `<td style="color:${r.chugjing > 0 ? 'var(--warn)' : 'inherit'};font-weight:${r.chugjing > 0 ? '700' : '400'};">${r.chugjing > 0 ? '-' + fmt(r.chugjing) : '0'}</td>`;
-        h += `<td style="font-weight:700;color:${net < 0 ? 'var(--warn)' : 'inherit'};">${fmt(net)}</td>`;
-      }
+      h += `<td style="font-weight:700;color:var(--accent2);">${fmt(r.credit)}</td>`;
+      h += `<td>${r.sahu ? sahuLabel(r.sahu.type) : '-'}</td>`;
+      h += `<td style="color:${r.chugjing > 0 ? 'var(--warn)' : 'inherit'};font-weight:${r.chugjing > 0 ? '700' : '400'};">${r.chugjing > 0 ? '-' + fmt(r.chugjing) : '0'}</td>`;
+      h += `<td style="font-weight:700;color:${net < 0 ? 'var(--warn)' : 'inherit'};">${fmt(net)}</td>`;
     }
     h += '</tr>';
   });
@@ -674,7 +655,7 @@ function renderDetails(results, danggi, corp) {
   results.forEach(r => {
     if (r.roleIdx === 0) return; // 전기 skip
 
-    const cardClass = r.roleIdx === 1 ? 'card-danggi' : (r.terminated ? 'card-terminated' : 'card-addtl');
+    const cardClass = r.roleIdx === 1 ? 'card-danggi' : 'card-addtl';
 
     h += `<div class="detail-card ${cardClass}">`;
     h += `<div class="detail-title">`;
@@ -702,8 +683,6 @@ function renderDetails(results, danggi, corp) {
       }
       h += `<br><strong>당기공제액: <code>${fmt(danggi.total)}만원</code></strong>`;
       h += '</div>';
-    } else if (r.terminated && r.credit === 0 && r.chugjing === 0) {
-      h += '<p style="color:var(--text-muted);font-style:italic;">이전 연도에서 전체 감소로 즉시 중단되어 공제 불가</p>';
     } else {
       // 추가공제 상세
       if (r.addtl) {
@@ -734,11 +713,12 @@ function renderDetails(results, danggi, corp) {
         h += `<strong style="color:var(--warn);">사후관리</strong> (${r.year}년 vs ${results[1].year}년 당기)<br><br>`;
         if (r.sahu.type === 'total_dec') {
           h += `전체 근로자 감소: <code>${fmtD(r.sahu.tDec)}명</code> (청년 ${fmtD(r.sahu.yDec)}명)<br>`;
-          h += `<strong style="color:var(--warn);">→ 즉시 중단 + 기존 공제 전액 몰수: <code>${fmt(r.chugjing)}만원 추징</code></strong>`;
+          h += `감소분 × 단가 = <code>${fmt(r.chugjing)}만원</code><br>`;
+          h += `<strong style="color:var(--warn);">→ 감소분 추징: <code>${fmt(r.chugjing)}만원</code></strong>`;
         } else if (r.sahu.type === 'youth_only') {
           h += `청년 감소: <code>${fmtD(r.sahu.yDec)}명</code> (전체는 유지)<br>`;
-          h += `차액/연: <code>${fmt(r.sahu.chugjing)}만원</code> × ${r.addtlIdx + 1}년(소급) = <code>${fmt(r.chugjing)}만원</code><br>`;
-          h += `<strong style="color:var(--warn);">→ 소급추징: <code>${fmt(r.chugjing)}만원</code></strong>`;
+          h += `차액(청년단가-비청년단가) × 감소인원 = <code>${fmt(r.chugjing)}만원</code><br>`;
+          h += `<strong style="color:var(--warn);">→ 차액 추징: <code>${fmt(r.chugjing)}만원</code></strong>`;
         }
         h += '</div>';
       }
