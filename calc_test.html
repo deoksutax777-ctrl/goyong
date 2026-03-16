@@ -591,6 +591,7 @@ function renderSummary(all, from, to) {
   }
 
   // Highlight
+  const grandNet = grandCredit - grandChug;
   h += '<div class="highlight-box">';
   h += `<div class="label">입력 기간 내 총 순공제액</div>`;
   h += `<div class="big">${fmt(grandNet)}만원</div>`;
