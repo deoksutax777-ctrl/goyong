@@ -7,21 +7,13 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f0f2f5;
-    --surface: #ffffff;
-    --surface2: #f8f9fb;
-    --border: #d0d5dd;
-    --text: #1a2332;
-    --text-muted: #5a6a7e;
-    --accent: #1a4fa8;
-    --accent-light: #e8eef8;
-    --accent2: #0e7c61;
-    --accent2-light: #e6f4f0;
-    --warn: #c0392b;
-    --warn-light: #fdf0ee;
-    --header-bg: #e4eaf4;
-    --font: 'Noto Sans KR', sans-serif;
-    --mono: 'IBM Plex Mono', monospace;
+    --bg: #f0f2f5; --surface: #ffffff; --surface2: #f8f9fb;
+    --border: #d0d5dd; --text: #1a2332; --text-muted: #5a6a7e;
+    --accent: #1a4fa8; --accent-light: #e8eef8;
+    --accent2: #0e7c61; --accent2-light: #e6f4f0;
+    --warn: #c0392b; --warn-light: #fdf0ee;
+    --orange: #e67e22; --orange-light: #fef6e8;
+    --font: 'Noto Sans KR', sans-serif; --mono: 'IBM Plex Mono', monospace;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 13px; min-height: 100vh; }
@@ -34,170 +26,135 @@
   }
   .app-header h1 { font-size: 16px; font-weight: 600; letter-spacing: -.3px; }
   .app-header .sub { font-size: 11px; opacity: .75; margin-top: 2px; }
+  .nav-btns { display: flex; gap: 8px; align-items: center; }
   .nav-btns a {
     padding: 7px 14px; border-radius: 6px; font-size: 12px; font-weight: 600;
     text-decoration: none; transition: all .15s;
   }
-  .nav-btns a.active { background: #fff; color: var(--accent); border: 2px solid #fff; cursor: default; }
+  .nav-btns a.active { background: #fff; color: var(--accent); border: 2px solid #fff; }
   .nav-btns a:not(.active) { background: transparent; color: rgba(255,255,255,.85); border: 2px solid rgba(255,255,255,.4); }
   .nav-btns a:not(.active):hover { background: rgba(255,255,255,.15); }
 
-  .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
-
+  .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
   .panel {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 8px; margin-bottom: 20px; overflow: hidden;
+    border-radius: 10px; margin-bottom: 20px; overflow: hidden;
   }
   .panel-header {
-    background: var(--header-bg); padding: 10px 16px; font-weight: 600;
+    background: var(--surface2); padding: 10px 16px; font-weight: 600;
     font-size: 13px; color: var(--accent); border-bottom: 1px solid var(--border);
     display: flex; align-items: center; gap: 8px;
   }
-  .panel-header .icon { font-size: 14px; }
   .panel-body { padding: 16px; }
-
-  .config-row {
-    display: flex; gap: 16px; align-items: end; flex-wrap: wrap; margin-bottom: 8px;
-  }
+  .config-row { display: flex; gap: 16px; align-items: end; flex-wrap: wrap; }
   .field-group { display: flex; flex-direction: column; gap: 4px; }
-  .field-group label {
-    font-size: 11px; font-weight: 600; color: var(--text-muted);
-    text-transform: uppercase; letter-spacing: .5px;
-  }
+  .field-group label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
   .field-group select, .field-group input {
     border: 1px solid var(--border); border-radius: 5px; padding: 7px 10px;
-    font-family: var(--font); font-size: 13px; color: var(--text);
-    background: var(--surface); transition: border-color .15s;
+    font-family: var(--font); font-size: 13px; color: var(--text); background: var(--surface);
   }
-  .field-group input:focus, .field-group select:focus {
-    outline: none; border-color: var(--accent);
-    box-shadow: 0 0 0 2px rgba(26,79,168,.1);
-  }
-  input[type=number] { width: 100px; text-align: right; font-family: var(--mono); }
+  .field-group input:focus, .field-group select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(26,79,168,.1); }
+  input[type=number] { width: 90px; text-align: right; font-family: var(--mono); }
 
-  .calc-table {
-    width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px;
+  /* Input table */
+  .input-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  .input-table th {
+    padding: 8px 10px; border: 1px solid var(--border); font-weight: 600; text-align: center; white-space: nowrap;
   }
-  .calc-table th {
-    background: #eef2fa; padding: 8px 10px; border: 1px solid var(--border);
-    font-weight: 600; text-align: center; white-space: nowrap;
-  }
-  .calc-table th.youth-hdr { background: var(--accent2-light); color: var(--accent2); }
-  .calc-table th.normal-hdr { background: #f0f2f8; color: var(--accent); }
-  .calc-table td {
-    padding: 7px 10px; border: 1px solid var(--border);
-    text-align: center; font-family: var(--mono); font-size: 12px;
-  }
-  .calc-table td.label-cell {
-    font-family: var(--font); font-weight: 500; text-align: left;
-    background: var(--surface2); white-space: nowrap;
-  }
-  .calc-table td.result { font-weight: 700; color: var(--accent); }
-  .calc-table td.result-green { font-weight: 700; color: var(--accent2); }
-  .calc-table td input[type=number] {
-    width: 90px; text-align: right; border: 1px solid var(--border);
-    border-radius: 4px; padding: 4px 6px; font-family: var(--mono); font-size: 12px;
-  }
-  .calc-table tr.total-row td {
-    background: var(--accent-light); font-weight: 700; border-top: 2px solid var(--accent);
-  }
+  .input-table th.y-hdr { background: var(--accent2-light); color: var(--accent2); }
+  .input-table th.n-hdr { background: #f0f2f8; color: var(--accent); }
+  .input-table td { padding: 6px 8px; border: 1px solid var(--border); text-align: center; }
+  .input-table td.lbl { font-family: var(--font); font-weight: 500; text-align: left; background: var(--surface2); white-space: nowrap; }
+  .input-table td input[type=number] { width: 80px; text-align: right; border: 1px solid var(--border); border-radius: 4px; padding: 4px 6px; font-family: var(--mono); font-size: 12px; }
 
-  /* Summary table */
-  .summary-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .summary-table th {
-    background: var(--accent); color: #fff; padding: 10px 12px;
-    border: 1px solid #1a4fa8; text-align: center; font-weight: 600;
+  /* Timeline cards */
+  .tl-section { margin-bottom: 28px; }
+  .tl-title {
+    font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
   }
-  .summary-table td {
-    padding: 10px 12px; border: 1px solid var(--border);
-    text-align: center; font-family: var(--mono); font-size: 13px;
+  .tl-title-badge {
+    display: inline-block; padding: 3px 10px; border-radius: 5px;
+    font-size: 12px; font-weight: 700; color: #fff; background: var(--accent);
   }
-  .summary-table td.label-cell {
-    font-family: var(--font); font-weight: 600; text-align: left;
-    background: var(--surface2);
+  .tl-row {
+    display: flex; align-items: stretch; overflow-x: auto; padding-bottom: 4px;
   }
-  .summary-table tr.row-prev td { background: #f8f9fb; color: var(--text-muted); }
-  .summary-table tr.row-danggi td { background: #e8eef8; }
-  .summary-table tr.row-addtl td { background: #e6f4f0; }
-  .summary-table tr.row-total td {
-    background: var(--accent); color: #fff; font-weight: 700; font-size: 14px;
-    border-color: #1a4fa8;
+  .tl-arrow {
+    display: flex; align-items: center; padding: 0 6px; color: #bbb; font-size: 22px; flex-shrink: 0;
   }
-  .summary-table tr.row-total td.label-cell { background: var(--accent); color: #fff; }
+  .tl-card {
+    min-width: 155px; max-width: 190px; flex-shrink: 0;
+    background: #fff; border: 2px solid var(--border); border-radius: 12px;
+    padding: 14px 12px; text-align: center; transition: box-shadow .2s;
+  }
+  .tl-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+  .tl-card.c-prev { border-color: #ccc; background: #f8f9fb; }
+  .tl-card.c-danggi { border-color: var(--accent); background: linear-gradient(135deg, #e8eef8, #f0f4fb); }
+  .tl-card.c-addtl { border-color: var(--accent2); background: linear-gradient(135deg, #e6f4f0, #f0faf6); }
+  .tl-card.c-chug { border-color: var(--orange); background: linear-gradient(135deg, var(--orange-light), #fff8f0); }
+  .tl-card.c-missing { border-style: dashed; border-color: #ccc; background: #fafafa; opacity: .55; }
+  .tl-card-year { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
+  .tl-card-role { margin-bottom: 8px; }
+  .tl-card-amount { font-size: 16px; font-weight: 700; font-family: var(--mono); }
+  .tl-card-amount.blue { color: var(--accent); }
+  .tl-card-amount.green { color: var(--accent2); }
+  .tl-card-detail { font-size: 10px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
+  .tl-card-chug { font-size: 11px; color: var(--warn); font-weight: 600; margin-top: 4px; }
+  .tl-card-net { font-size: 12px; font-weight: 700; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
 
-  .badge {
-    display: inline-block; padding: 2px 8px; border-radius: 4px;
-    font-size: 11px; font-weight: 600; letter-spacing: .3px;
-  }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; }
   .badge-prev { background: #e9ecef; color: #6c757d; }
   .badge-danggi { background: var(--accent-light); color: var(--accent); }
   .badge-addtl { background: var(--accent2-light); color: var(--accent2); }
   .badge-ok { background: #d4edda; color: #155724; }
   .badge-warn { background: #fff3cd; color: #856404; }
   .badge-danger { background: #f8d7da; color: #721c24; }
+  .badge-na { background: #e9ecef; color: #999; }
 
-  /* Detail cards */
-  .detail-card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 8px; padding: 16px; margin-bottom: 12px;
+  /* Progress bar */
+  .tl-progress { margin-top: 10px; }
+  .progress-bar { height: 26px; background: #e9ecef; border-radius: 13px; overflow: hidden; position: relative; }
+  .progress-fill {
+    height: 100%; border-radius: 13px; display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 12px; font-family: var(--mono);
+    transition: width .3s ease; min-width: fit-content; padding: 0 14px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
   }
-  .detail-card.card-danggi { border-left: 4px solid var(--accent); }
-  .detail-card.card-addtl { border-left: 4px solid var(--accent2); }
-  .detail-card.card-terminated { border-left: 4px solid var(--warn); opacity: 0.7; }
-  .detail-title {
-    font-size: 14px; font-weight: 700; margin-bottom: 10px;
-    display: flex; align-items: center; gap: 8px;
-  }
-  .detail-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 8px; margin-top: 8px;
-  }
-  .detail-item {
-    background: var(--surface2); border-radius: 6px; padding: 10px 12px;
-  }
-  .detail-item .di-label { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
-  .detail-item .di-val { font-size: 15px; font-weight: 700; font-family: var(--mono); }
-  .detail-item.di-blue .di-val { color: var(--accent); }
-  .detail-item.di-green .di-val { color: var(--accent2); }
-  .detail-item.di-red .di-val { color: var(--warn); }
+  .progress-fill.has-chug { background: linear-gradient(90deg, var(--orange), #f39c12); }
+  .progress-label { font-size: 11px; color: var(--text-muted); margin-top: 4px; text-align: right; }
 
-  .formula-box {
-    background: #f8f9fb; border: 1px solid var(--border); border-radius: 6px;
-    padding: 10px 14px; margin-top: 8px; font-size: 12px; line-height: 1.8;
+  /* Grand summary matrix */
+  .matrix { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .matrix th {
+    background: var(--accent); color: #fff; padding: 10px 12px;
+    border: 1px solid #1a4fa8; text-align: center; font-weight: 600;
   }
-  .formula-box code {
-    font-family: var(--mono); background: #e8eef8; padding: 1px 5px;
-    border-radius: 3px; font-size: 11px;
+  .matrix td {
+    padding: 10px 12px; border: 1px solid var(--border);
+    text-align: center; font-family: var(--mono); font-size: 13px;
   }
+  .matrix td.lbl {
+    font-family: var(--font); font-weight: 600; text-align: left; background: var(--surface2);
+  }
+  .matrix .cell-credit { color: var(--accent2); font-weight: 600; }
+  .matrix .cell-chug { color: var(--warn); font-size: 11px; }
+  .matrix tr.row-total td { background: var(--accent); color: #fff; font-weight: 700; border-color: #1a4fa8; }
+  .matrix tr.row-total td.lbl { background: var(--accent); color: #fff; }
+  .matrix td.col-total { background: var(--accent-light); font-weight: 700; color: var(--accent); }
 
-  .result-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;
+  .highlight-box {
+    background: var(--accent); color: #fff; border-radius: 10px;
+    padding: 16px 24px; margin-top: 16px; text-align: center;
   }
-  .result-card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 7px; padding: 12px 16px; text-align: center;
-  }
-  .result-card .rc-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
-  .result-card .rc-val { font-size: 18px; font-weight: 700; font-family: var(--mono); }
-  .result-card .rc-sub { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
-  .result-card.blue { border-color: var(--accent); }
-  .result-card.blue .rc-val { color: var(--accent); }
-  .result-card.green { border-color: var(--accent2); }
-  .result-card.green .rc-val { color: var(--accent2); }
-  .result-card.red { border-color: var(--warn); }
-  .result-card.red .rc-val { color: var(--warn); }
-  .result-card.highlight {
-    background: var(--accent); border-color: var(--accent);
-  }
-  .result-card.highlight .rc-label { color: rgba(255,255,255,.8); }
-  .result-card.highlight .rc-val { color: #fff; }
-  .result-card.highlight .rc-sub { color: rgba(255,255,255,.7); }
+  .highlight-box .big { font-size: 28px; font-weight: 700; font-family: var(--mono); }
+  .highlight-box .label { font-size: 12px; opacity: .8; margin-bottom: 4px; }
 
-  @media print {
-    .app-header, .no-print { display: none !important; }
-    .container { padding: 0; }
-    body { background: #fff; }
+  @media (max-width: 768px) {
+    .container { padding: 12px; }
+    .tl-card { min-width: 130px; padding: 10px 8px; }
   }
+  @media print { .app-header, .no-print { display: none !important; } body { background: #fff; } }
 </style>
 </head>
 <body>
@@ -205,9 +162,9 @@
 <div class="app-header">
   <div>
     <h1>통합고용세액공제 계산기 <span style="font-size:12px;font-weight:400;opacity:.7;">by Deoksu Tax Firm</span></h1>
-    <div class="sub">조세특례제한법 제29조의8 | 시작연도 기준 동적 계산</div>
+    <div class="sub">조세특례제한법 제29조의8 | 다중 시작연도 누적 분석</div>
   </div>
-  <div class="nav-btns" style="display:flex;gap:8px;align-items:center;">
+  <div class="nav-btns">
     <a href="index.html">명세서 (현행)</a>
     <a href="index_old.html">명세서 (개정 전)</a>
     <a href="calc_test.html" class="active">세액공제 계산</a>
@@ -216,9 +173,8 @@
 
 <div class="container">
 
-  <!-- 설정 -->
   <div class="panel no-print">
-    <div class="panel-header"><span class="icon">&#9881;</span> 기본 설정</div>
+    <div class="panel-header">&#9881; 기본 설정</div>
     <div class="panel-body">
       <div class="config-row">
         <div class="field-group">
@@ -230,585 +186,402 @@
           </select>
         </div>
         <div class="field-group">
-          <label>당기 시작연도</label>
-          <select id="start-year" onchange="onSettingsChange()">
-          </select>
+          <label>입력 시작연도</label>
+          <select id="year-from" onchange="onSettingsChange()"></select>
         </div>
-        <div style="font-size:11px;color:var(--text-muted);align-self:center;padding-bottom:2px;">
-          <span id="info-text"></span>
+        <div class="field-group">
+          <label>입력 종료연도</label>
+          <select id="year-to" onchange="onSettingsChange()"></select>
         </div>
+        <div style="font-size:11px;color:var(--text-muted);align-self:center;" id="info-text"></div>
       </div>
     </div>
   </div>
 
-  <!-- 근로자수 입력 -->
   <div class="panel">
-    <div class="panel-header"><span class="icon">&#128203;</span> 상시근로자수 입력</div>
+    <div class="panel-header">&#128203; 상시근로자수 입력</div>
     <div class="panel-body">
-      <p style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">
-        전기(기준)부터 마지막 추가공제 연도까지 입력하세요. 자동으로 공제액이 계산됩니다.
-      </p>
+      <p style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">연도별 상시근로자수를 입력하면 가능한 모든 시작연도의 세액공제가 자동 계산됩니다.</p>
       <div id="input-area"></div>
     </div>
   </div>
 
-  <!-- 공제 흐름 요약 -->
+  <div id="timelines-area"></div>
+
   <div class="panel">
-    <div class="panel-header" style="background:var(--accent);color:#fff;">
-      <span class="icon">&#128200;</span> 공제 흐름 요약
-    </div>
+    <div class="panel-header" style="background:var(--accent);color:#fff;">&#128200; 연도별 세액공제 종합</div>
     <div class="panel-body" id="summary-area"></div>
   </div>
 
-  <!-- 연도별 상세 -->
-  <div id="detail-area"></div>
-
 </div>
 
-<footer style="background:#1a2332;color:#8a9bb0;text-align:center;padding:20px 32px;font-size:12px;font-family:var(--font);letter-spacing:.3px;margin-top:8px;">
-  <div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;">
-    <span style="color:#fff;font-weight:600;font-size:13px;">Made with</span>
-    <span style="color:#e8eef8;">&#10038;</span>
-    <span style="color:#a8c4f0;font-weight:500;">김태현 세무사</span>
-    <span style="color:#4a5a6e;">&middot;</span>
-    <span style="color:#a8c4f0;font-weight:500;">Claude AI</span>
-    <span style="color:#4a5a6e;">|</span>
-    <span style="color:#5a6a7e;font-size:11px;">통합고용세액공제 계산기</span>
-  </div>
+<footer style="background:#1a2332;color:#8a9bb0;text-align:center;padding:20px 32px;font-size:12px;">
+  <span style="color:#fff;font-weight:600;">Made with</span> &#10038;
+  <span style="color:#a8c4f0;">김태현 세무사</span> &middot;
+  <span style="color:#a8c4f0;">Claude AI</span> |
+  <span style="color:#5a6a7e;font-size:11px;">통합고용세액공제 계산기</span>
 </footer>
 
 <script>
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 공제 단가 (단위: 만원)
+// 공제 단가 (만원)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const RATES = {
-  '중소': {
-    youth:  { metro: 1450, local: 1550 },
-    normal: { metro: 850,  local: 950  },
-    years: 3
-  },
-  '중견': {
-    youth:  { metro: 800, local: 800 },
-    normal: { metro: 450, local: 450 },
-    years: 3
-  },
-  '대기업': {
-    youth:  { metro: 400, local: 400 },
-    normal: { metro: 0,   local: 0   },
-    years: 2
-  }
+  '중소': { youth: { metro: 1450, local: 1550 }, normal: { metro: 850, local: 950 }, years: 3 },
+  '중견': { youth: { metro: 800, local: 800 }, normal: { metro: 450, local: 450 }, years: 3 },
+  '대기업': { youth: { metro: 400, local: 400 }, normal: { metro: 0, local: 0 }, years: 2 }
 };
 
-let savedValues = {};
+let saved = {};
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// HELPERS
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function fmt(n) { return n.toLocaleString('ko-KR'); }
 function fmtD(n) { return Number.isInteger(n) ? n.toString() : n.toFixed(2); }
 function getCorp() { return document.getElementById('corp-type').value; }
-function getStartYear() { return parseInt(document.getElementById('start-year').value); }
+function getFrom() { return +document.getElementById('year-from').value; }
+function getTo() { return +document.getElementById('year-to').value; }
 
-function getW(year) {
-  const g = (id) => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
-  return { ym: g('w'+year+'-ym'), yl: g('w'+year+'-yl'), nm: g('w'+year+'-nm'), nl: g('w'+year+'-nl') };
+function getW(y) {
+  const g = id => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
+  return { ym: g('w'+y+'-ym'), yl: g('w'+y+'-yl'), nm: g('w'+y+'-nm'), nl: g('w'+y+'-nl') };
 }
-
 function totalW(w) { return w.ym + w.yl + w.nm + w.nl; }
 function youthW(w) { return w.ym + w.yl; }
-
-function diffW(a, b) {
-  return { ym: a.ym - b.ym, yl: a.yl - b.yl, nm: a.nm - b.nm, nl: a.nl - b.nl };
-}
-
-function maxZero(w) {
-  return { ym: Math.max(0, w.ym), yl: Math.max(0, w.yl), nm: Math.max(0, w.nm), nl: Math.max(0, w.nl) };
-}
-
-function saveInputValues() {
-  document.querySelectorAll('#input-area input[type=number]').forEach(el => {
-    savedValues[el.id] = el.value;
-  });
-}
-
-function restoreInputValues() {
-  document.querySelectorAll('#input-area input[type=number]').forEach(el => {
-    if (savedValues[el.id] !== undefined) el.value = savedValues[el.id];
-  });
-}
+function diffW(a, b) { return { ym: a.ym-b.ym, yl: a.yl-b.yl, nm: a.nm-b.nm, nl: a.nl-b.nl }; }
+function maxZ(w) { return { ym: Math.max(0,w.ym), yl: Math.max(0,w.yl), nm: Math.max(0,w.nm), nl: Math.max(0,w.nl) }; }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 당기공제 계산
+// 당기공제
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function calcDanggi(corp, diff) {
-  const rate = RATES[corp];
-  const inc = maxZero(diff);
-  const amt = {
-    ym: inc.ym * rate.youth.metro,
-    yl: inc.yl * rate.youth.local,
-    nm: inc.nm * rate.normal.metro,
-    nl: inc.nl * rate.normal.local
-  };
-  return { inc, amt, total: amt.ym + amt.yl + amt.nm + amt.nl };
+  const r = RATES[corp], inc = maxZ(diff);
+  const amt = { ym: inc.ym*r.youth.metro, yl: inc.yl*r.youth.local, nm: inc.nm*r.normal.metro, nl: inc.nl*r.normal.local };
+  return { inc, amt, total: amt.ym+amt.yl+amt.nm+amt.nl };
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 추가공제 계산 (유지확인)
+// 추가공제 (유지확인)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function calcAddtl(corp, danggiInc, wCheck, wPrev) {
-  const rate = RATES[corp];
-  // 유지 증가분 = MAX(0, 추가공제연도 - 전기)
-  const kept = maxZero(diffW(wCheck, wPrev));
-  // 추가공제 = MIN(당기 증가분, 유지 증가분)
-  const inc = {
-    ym: Math.min(danggiInc.ym, kept.ym),
-    yl: Math.min(danggiInc.yl, kept.yl),
-    nm: Math.min(danggiInc.nm, kept.nm),
-    nl: Math.min(danggiInc.nl, kept.nl)
-  };
-  const amt = {
-    ym: inc.ym * rate.youth.metro,
-    yl: inc.yl * rate.youth.local,
-    nm: inc.nm * rate.normal.metro,
-    nl: inc.nl * rate.normal.local
-  };
-  return { kept, inc, amt, total: amt.ym + amt.yl + amt.nm + amt.nl };
+  const r = RATES[corp];
+  const kept = maxZ(diffW(wCheck, wPrev));
+  const inc = { ym: Math.min(danggiInc.ym,kept.ym), yl: Math.min(danggiInc.yl,kept.yl), nm: Math.min(danggiInc.nm,kept.nm), nl: Math.min(danggiInc.nl,kept.nl) };
+  const amt = { ym: inc.ym*r.youth.metro, yl: inc.yl*r.youth.local, nm: inc.nm*r.normal.metro, nl: inc.nl*r.normal.local };
+  return { kept, inc, amt, total: amt.ym+amt.yl+amt.nm+amt.nl };
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 사후관리 추징 계산 (조특법 제29조의8 시행령)
-// CASE A (가.㉠): 전체감소 + 청년감소≥전체감소
-// CASE B (가.㉡): 전체감소 + 청년감소<전체감소
-// CASE C (나.):   전체유지 + 청년만감소
-// CASE D:         추징없음
+// 사후관리 (조특법 시행령 기준)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-// 단일 지역 추징 기본금액 (multiplier 적용 전)
-function calcRegionRaw(yRate, nRate, yDanggi, nDanggi, yChk, nChk, yDanggiInc) {
-  const yDec = Math.max(0, yDanggi - yChk);
-  const nDec = Math.max(0, nDanggi - nChk);
-  const tDec = Math.max(0, (yDanggi + nDanggi) - (yChk + nChk));
-
-  if (tDec <= 0 && yDec <= 0) return 0;
-
-  // 나. CASE C: 전체 유지 + 청년만 감소
-  if (tDec <= 0 && yDec > 0) {
-    return Math.min(yDec, yDanggiInc) * (yRate - nRate);
-  }
-
-  // 가.㉠ CASE A: 청년감소 ≥ 전체감소
-  if (yDec >= tDec) {
-    const effYDec = Math.min(yDec, yDanggiInc); // 한도: 당기 청년증가
-    const converted = Math.max(0, effYDec - tDec); // 전환분
-    return converted * (yRate - nRate) + tDec * yRate;
-  }
-
-  // 가.㉡ CASE B: 청년감소 < 전체감소
-  return Math.min(yDec, tDec) * yRate + Math.min(nDec, tDec) * nRate;
+function calcRegionRaw(yR, nR, yD, nD, yC, nC, yInc) {
+  const yDec = Math.max(0, yD-yC), nDec = Math.max(0, nD-nC);
+  const tDec = Math.max(0, (yD+nD)-(yC+nC));
+  if (tDec<=0 && yDec<=0) return 0;
+  if (tDec<=0 && yDec>0) return Math.min(yDec,yInc)*(yR-nR);
+  if (yDec>=tDec) { const eff=Math.min(yDec,yInc); return Math.max(0,eff-tDec)*(yR-nR)+tDec*yR; }
+  return Math.min(yDec,tDec)*yR + Math.min(nDec,tDec)*nR;
 }
 
-// 전체 추징 계산 (multiplier: 2차=1, 3차=공제횟수)
-function sahuCheck(corp, wDanggi, wCheck, danggiInc, multiplier) {
-  const rate = RATES[corp];
-  const isSmall = (corp === '중소');
-
-  const yDec = Math.max(0, youthW(wDanggi) - youthW(wCheck));
-  const tDec = Math.max(0, totalW(wDanggi) - totalW(wCheck));
-
-  // type 판정
+function sahuCheck(corp, wD, wC, dInc, mult) {
+  const r = RATES[corp], isS = (corp==='중소');
+  const yDec = Math.max(0, youthW(wD)-youthW(wC));
+  const tDec = Math.max(0, totalW(wD)-totalW(wC));
   let type = 'ok';
-  if (tDec > 0 && yDec >= tDec) type = 'case_a';
-  else if (tDec > 0) type = 'case_b';
-  else if (yDec > 0) type = 'youth_only';
-
+  if (tDec>0 && yDec>=tDec) type='case_a';
+  else if (tDec>0) type='case_b';
+  else if (yDec>0) type='youth_only';
   let raw = 0;
-  if (type !== 'ok') {
-    if (isSmall) {
-      raw = calcRegionRaw(
-        rate.youth.metro, rate.normal.metro,
-        wDanggi.ym, wDanggi.nm, wCheck.ym, wCheck.nm, danggiInc.ym
-      ) + calcRegionRaw(
-        rate.youth.local, rate.normal.local,
-        wDanggi.yl, wDanggi.nl, wCheck.yl, wCheck.nl, danggiInc.yl
-      );
+  if (type!=='ok') {
+    if (isS) {
+      raw = calcRegionRaw(r.youth.metro,r.normal.metro,wD.ym,wD.nm,wC.ym,wC.nm,dInc.ym)
+          + calcRegionRaw(r.youth.local,r.normal.local,wD.yl,wD.nl,wC.yl,wC.nl,dInc.yl);
     } else {
-      raw = calcRegionRaw(
-        rate.youth.metro, rate.normal.metro,
-        youthW(wDanggi), totalW(wDanggi) - youthW(wDanggi),
-        youthW(wCheck), totalW(wCheck) - youthW(wCheck),
-        danggiInc.ym + danggiInc.yl
-      );
+      raw = calcRegionRaw(r.youth.metro,r.normal.metro,youthW(wD),totalW(wD)-youthW(wD),youthW(wC),totalW(wC)-youthW(wC),dInc.ym+dInc.yl);
     }
-    raw *= multiplier;
+    raw *= mult;
   }
-
   return { type, raw, yDec, tDec };
 }
 
-function sahuLabel(type) {
+function sahuBadge(type) {
   switch(type) {
-    case 'ok': return '<span class="badge badge-ok">CASE D: 정상 유지</span>';
-    case 'youth_only': return '<span class="badge badge-warn">CASE C (나.): 청년만 감소</span>';
-    case 'case_a': return '<span class="badge badge-danger">CASE A (가.㉠): 전체감소/청년≥전체</span>';
-    case 'case_b': return '<span class="badge badge-danger">CASE B (가.㉡): 전체감소/청년&lt;전체</span>';
-    default: return '-';
+    case 'ok': return '<span class="badge badge-ok">정상</span>';
+    case 'youth_only': return '<span class="badge badge-warn">나.청년감소</span>';
+    case 'case_a': return '<span class="badge badge-danger">가.㉠</span>';
+    case 'case_b': return '<span class="badge badge-danger">가.㉡</span>';
+    default: return '';
   }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// UI 구축
+// UI 초기화
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function initStartYearOptions() {
-  const sel = document.getElementById('start-year');
-  for (let y = 2020; y <= 2025; y++) {
-    const opt = document.createElement('option');
-    opt.value = y; opt.textContent = y + '년';
-    if (y === 2024) opt.selected = true;
-    sel.appendChild(opt);
-  }
+function initSelectors() {
+  const sf = document.getElementById('year-from');
+  const st = document.getElementById('year-to');
+  for (let y=2019; y<=2026; y++) { const o=document.createElement('option'); o.value=y; o.textContent=y+'년'; if(y===2022) o.selected=true; sf.appendChild(o); }
+  for (let y=2020; y<=2027; y++) { const o=document.createElement('option'); o.value=y; o.textContent=y+'년'; if(y===2025) o.selected=true; st.appendChild(o); }
 }
 
-function onSettingsChange() {
-  saveInputValues();
-  buildInputTable();
-  restoreInputValues();
-  recalc();
-}
+function saveVals() { document.querySelectorAll('#input-area input[type=number]').forEach(e => { saved[e.id]=e.value; }); }
+function restoreVals() { document.querySelectorAll('#input-area input[type=number]').forEach(e => { if(saved[e.id]!==undefined) e.value=saved[e.id]; }); }
 
-function buildInputTable() {
-  const corp = getCorp();
-  const startYear = getStartYear();
-  const rate = RATES[corp];
-  const maxYears = rate.years;
-  const isSmall = (corp === '중소');
-  const hasNormal = (corp !== '대기업');
+function onSettingsChange() { saveVals(); buildInput(); restoreVals(); recalcAll(); }
 
-  // 연도 범위: 전기 ~ 마지막 추가공제
-  const years = [];
-  for (let y = startYear - 1; y <= startYear + maxYears - 1; y++) years.push(y);
+function buildInput() {
+  const corp=getCorp(), from=getFrom(), to=getTo();
+  const isS=(corp==='중소'), hasN=(corp!=='대기업');
+  if (to<=from) { document.getElementById('input-area').innerHTML='<p style="color:var(--warn);">종료연도가 시작연도보다 커야 합니다.</p>'; return; }
 
-  // 안내 텍스트
-  const info = document.getElementById('info-text');
-  info.textContent = `전기: ${startYear-1}년 → 당기: ${startYear}년 → 추가공제: ${startYear+1}~${startYear+maxYears-1}년 (${maxYears}년간)`;
+  const starts = []; for (let y=from+1; y<=to; y++) starts.push(y);
+  document.getElementById('info-text').textContent = `입력: ${from}~${to}년 → 시작연도: ${starts.join(', ')}년`;
 
-  let h = '<table class="calc-table"><thead><tr>';
-  h += '<th rowspan="2" style="width:160px;">연도</th>';
-  h += `<th colspan="${isSmall ? 2 : 1}" class="youth-hdr">청년등</th>`;
-  if (hasNormal) h += `<th colspan="${isSmall ? 2 : 1}" class="normal-hdr">청년등외</th>`;
-  h += '</tr><tr>';
-  h += `<th class="youth-hdr">${isSmall ? '수도권' : '전체'}</th>`;
-  if (isSmall) h += '<th class="youth-hdr">비수도권</th>';
-  if (hasNormal) {
-    h += `<th class="normal-hdr">${isSmall ? '수도권' : '전체'}</th>`;
-    if (isSmall) h += '<th class="normal-hdr">비수도권</th>';
+  let h='<table class="input-table"><thead><tr>';
+  h+='<th rowspan="2" style="width:80px;">연도</th>';
+  h+=`<th colspan="${isS?2:1}" class="y-hdr">청년등</th>`;
+  if(hasN) h+=`<th colspan="${isS?2:1}" class="n-hdr">청년등외</th>`;
+  h+='</tr><tr>';
+  h+=`<th class="y-hdr">${isS?'수도권':'전체'}</th>`;
+  if(isS) h+='<th class="y-hdr">비수도권</th>';
+  if(hasN) { h+=`<th class="n-hdr">${isS?'수도권':'전체'}</th>`; if(isS) h+='<th class="n-hdr">비수도권</th>'; }
+  h+='</tr></thead><tbody>';
+
+  for (let y=from; y<=to; y++) {
+    h+=`<tr><td class="lbl"><strong>${y}년</strong></td>`;
+    h+=`<td><input type="number" id="w${y}-ym" step="0.01" value="0" oninput="recalcAll()"></td>`;
+    if(isS) h+=`<td><input type="number" id="w${y}-yl" step="0.01" value="0" oninput="recalcAll()"></td>`;
+    if(hasN) { h+=`<td><input type="number" id="w${y}-nm" step="0.01" value="0" oninput="recalcAll()"></td>`; if(isS) h+=`<td><input type="number" id="w${y}-nl" step="0.01" value="0" oninput="recalcAll()"></td>`; }
+    h+='</tr>';
   }
-  h += '</tr></thead><tbody>';
-
-  years.forEach((y, i) => {
-    let role, bg;
-    if (i === 0) { role = '전기'; bg = '#f8f9fb'; }
-    else if (i === 1) { role = '당기'; bg = '#e8eef8'; }
-    else { role = (i-1) + '차 추가'; bg = '#e6f4f0'; }
-
-    h += `<tr style="background:${bg}">`;
-    h += `<td class="label-cell" style="background:${bg}">`;
-    h += `<strong>${y}년</strong> `;
-    h += `<span class="badge badge-${i===0?'prev':i===1?'danggi':'addtl'}">${role}</span>`;
-    h += '</td>';
-    h += `<td><input type="number" id="w${y}-ym" step="0.01" value="0" oninput="recalc()"></td>`;
-    if (isSmall) h += `<td><input type="number" id="w${y}-yl" step="0.01" value="0" oninput="recalc()"></td>`;
-    if (hasNormal) {
-      h += `<td><input type="number" id="w${y}-nm" step="0.01" value="0" oninput="recalc()"></td>`;
-      if (isSmall) h += `<td><input type="number" id="w${y}-nl" step="0.01" value="0" oninput="recalc()"></td>`;
-    }
-    h += '</tr>';
-  });
-
-  h += '</tbody></table>';
+  h+='</tbody></table>';
   document.getElementById('input-area').innerHTML = h;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 전체 재계산
+// 타임라인 계산 (단일 시작연도)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function recalc() {
-  const corp = getCorp();
-  const startYear = getStartYear();
-  const rate = RATES[corp];
-  const maxYears = rate.years;
-  const isSmall = (corp === '중소');
-  const hasNormal = (corp !== '대기업');
+function calcTimeline(startY) {
+  const corp=getCorp(), r=RATES[corp], maxY=r.years;
+  const from=getFrom(), to=getTo();
+  const prev=startY-1;
+  const wPrev=getW(prev), wDanggi=getW(startY);
+  const diff=diffW(wDanggi, wPrev);
+  const danggi=calcDanggi(corp, diff);
 
-  const prevYear = startYear - 1;
-  const wPrev = getW(prevYear);
-  const wDanggi = getW(startYear);
-  const diff = diffW(wDanggi, wPrev);
+  const tl = [];
+  tl.push({ year:prev, role:'전기', credit:0, chugjing:0, sahu:null, hasData:true });
+  tl.push({ year:startY, role:'당기', credit:danggi.total, chugjing:0, sahu:null, hasData:true, danggi, diff });
 
-  // 당기공제
-  const danggi = calcDanggi(corp, diff);
+  for (let i=1; i<maxY; i++) {
+    const cy = startY+i;
+    const hasData = cy>=from && cy<=to;
 
-  // 추가공제 & 사후관리 for each year
-  const results = [];
-
-  results.push({
-    year: prevYear, role: '전기', roleIdx: 0,
-    w: wPrev, credit: 0, addtl: null, sahu: null, chugjing: 0
-  });
-
-  results.push({
-    year: startYear, role: '당기공제', roleIdx: 1,
-    w: wDanggi, diff: diff, danggi: danggi,
-    credit: danggi.total, addtl: null, sahu: null, chugjing: 0
-  });
-
-  for (let i = 1; i < maxYears; i++) {
-    const checkYear = startYear + i;
-    const wCheck = getW(checkYear);
-
-    // 추가공제 계산 (유지확인: 확인연도 vs 전기) - 항상 계산
-    const addtl = calcAddtl(corp, danggi.inc, wCheck, wPrev);
-    const credit = addtl.total;
-
-    // 사후관리 추징 계산
-    let sahu, chugjing = 0, limit = 0, multiplier = 1, prevChugjing = 0;
-
-    if (i === 1) {
-      // ① 2차년도: multiplier=1, 한도=직전1년 공제세액
-      multiplier = 1;
-      limit = danggi.total;
-      sahu = sahuCheck(corp, wDanggi, wCheck, danggi.inc, multiplier);
-      chugjing = Math.min(sahu.raw, limit);
-    } else if (i === 2) {
-      // ② 3차년도: multiplier=직전2년 공제횟수, 한도=직전2년 공제세액합계
-      const prevResult = results[results.length - 1];
-      const creditCount = (danggi.total > 0 ? 1 : 0) + (prevResult.credit > 0 ? 1 : 0);
-      multiplier = creditCount;
-      limit = danggi.total + prevResult.credit; // 직전 2년 공제세액 합계
-      prevChugjing = prevResult.chugjing; // ①에서 이미 계산한 금액
-      sahu = sahuCheck(corp, wDanggi, wCheck, danggi.inc, multiplier);
-      chugjing = Math.min(Math.max(0, sahu.raw - prevChugjing), limit);
+    if (!hasData) {
+      tl.push({ year:cy, role:i+'차 추가', credit:0, chugjing:0, sahu:null, hasData:false, idx:i });
+      continue;
     }
 
-    results.push({
-      year: checkYear, role: i + '차 추가공제', roleIdx: i + 1,
-      w: wCheck, credit, addtl, sahu, chugjing,
-      addtlIdx: i, limit, multiplier, prevChugjing
-    });
-  }
+    const wC=getW(cy);
+    const addtl=calcAddtl(corp, danggi.inc, wC, wPrev);
+    const credit=addtl.total;
+    let sahu, chugjing=0, limit=0, mult=1, prevChug=0;
 
-  renderSummary(results, danggi, corp);
-  renderDetails(results, danggi, corp);
+    if (i===1) {
+      mult=1; limit=danggi.total;
+      sahu=sahuCheck(corp, wDanggi, wC, danggi.inc, mult);
+      chugjing=Math.min(sahu.raw, limit);
+    } else if (i===2) {
+      const p=tl[tl.length-1];
+      const cnt=(danggi.total>0?1:0)+((p.hasData&&p.credit>0)?1:0);
+      mult=cnt; limit=danggi.total+(p.hasData?p.credit:0);
+      prevChug=p.hasData?p.chugjing:0;
+      sahu=sahuCheck(corp, wDanggi, wC, danggi.inc, mult);
+      chugjing=Math.min(Math.max(0, sahu.raw-prevChug), limit);
+    }
+
+    tl.push({ year:cy, role:i+'차 추가', credit, chugjing, sahu, hasData:true, addtl, idx:i, limit, mult, prevChug });
+  }
+  return { startY, danggi, tl };
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 요약 테이블 렌더링
+// 전체 재계산 & 렌더
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function renderSummary(results, danggi, corp) {
-  const isSmall = (corp === '중소');
-  const hasNormal = (corp !== '대기업');
+function recalcAll() {
+  const from=getFrom(), to=getTo();
+  if (to<=from) return;
 
-  let totalCredit = 0, totalChugjing = 0;
+  const starts=[]; for(let y=from+1; y<=to; y++) starts.push(y);
+  const all = starts.map(s => calcTimeline(s));
 
-  let h = '<table class="summary-table"><thead><tr>';
-  h += '<th style="width:160px;">연도</th>';
-  h += '<th>구분</th>';
-  h += '<th>공제액 (만원)</th>';
-  h += '<th>사후관리</th>';
-  h += '<th>추징액 (만원)</th>';
-  h += '<th>순공제 (만원)</th>';
-  h += '</tr></thead><tbody>';
+  renderTimelines(all);
+  renderSummary(all, from, to);
+}
 
-  results.forEach(r => {
-    let rowClass = '';
-    if (r.roleIdx === 0) rowClass = 'row-prev';
-    else if (r.roleIdx === 1) rowClass = 'row-danggi';
-    else rowClass = 'row-addtl';
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 타임라인 카드 렌더링
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function renderTimelines(all) {
+  const corp=getCorp(), maxY=RATES[corp].years;
+  let h = '';
 
-    const net = r.credit - r.chugjing;
-    totalCredit += r.credit;
-    totalChugjing += r.chugjing;
+  all.forEach(({startY, danggi, tl}) => {
+    const totalCredit = tl.reduce((s,t) => s+(t.hasData?t.credit:0), 0);
+    const totalChug = tl.reduce((s,t) => s+(t.hasData?t.chugjing:0), 0);
+    const net = totalCredit - totalChug;
+    const maxPossible = danggi.total * maxY;
+    const pct = maxPossible>0 ? Math.min(100, Math.max(5, (net/maxPossible)*100)) : 0;
+    const hasAnyCredit = danggi.total > 0;
 
-    h += `<tr class="${rowClass}">`;
-    h += `<td class="label-cell"><strong>${r.year}년</strong></td>`;
+    h += '<div class="tl-section">';
+    h += `<div class="tl-title"><span class="tl-title-badge">${startY}년 시작</span> ${startY}년 vs ${startY-1}년`;
+    if (!hasAnyCredit) h += ' <span style="color:var(--text-muted);font-weight:400;">(증가 없음)</span>';
+    h += '</div>';
 
-    if (r.roleIdx === 0) {
-      h += `<td><span class="badge badge-prev">전기 (기준)</span></td>`;
-      h += '<td>-</td><td>-</td><td>-</td><td>-</td>';
-    } else if (r.roleIdx === 1) {
-      h += `<td><span class="badge badge-danggi">당기공제</span></td>`;
-      h += `<td style="font-weight:700;color:var(--accent);">${fmt(r.credit)}</td>`;
-      h += '<td>-</td><td>-</td>';
-      h += `<td style="font-weight:700;">${fmt(r.credit)}</td>`;
-    } else {
-      h += `<td><span class="badge badge-addtl">${r.role}</span></td>`;
-      h += `<td style="font-weight:700;color:var(--accent2);">${fmt(r.credit)}</td>`;
-      h += `<td>${r.sahu ? sahuLabel(r.sahu.type) : '-'}</td>`;
-      h += `<td style="color:${r.chugjing > 0 ? 'var(--warn)' : 'inherit'};font-weight:${r.chugjing > 0 ? '700' : '400'};">${r.chugjing > 0 ? '-' + fmt(r.chugjing) : '0'}</td>`;
-      h += `<td style="font-weight:700;color:${net < 0 ? 'var(--warn)' : 'inherit'};">${fmt(net)}</td>`;
+    // Cards
+    h += '<div class="tl-row">';
+    tl.forEach((item, idx) => {
+      if (idx>0) h += '<div class="tl-arrow">&rarr;</div>';
+
+      let cc = 'tl-card ';
+      if (!item.hasData) cc += 'c-missing';
+      else if (item.role==='전기') cc += 'c-prev';
+      else if (item.role==='당기') cc += 'c-danggi';
+      else if (item.chugjing>0) cc += 'c-chug';
+      else cc += 'c-addtl';
+
+      h += `<div class="${cc}">`;
+      h += `<div class="tl-card-year">${item.year}년</div>`;
+
+      if (item.role==='전기') {
+        h += '<div class="tl-card-role"><span class="badge badge-prev">전기</span></div>';
+        h += '<div class="tl-card-amount" style="color:var(--text-muted);">기준</div>';
+        h += `<div class="tl-card-detail">전체 ${fmtD(totalW(getW(item.year)))}명</div>`;
+      } else if (!item.hasData) {
+        h += `<div class="tl-card-role"><span class="badge badge-na">${item.role}</span></div>`;
+        h += '<div class="tl-card-amount" style="color:#ccc;">미입력</div>';
+      } else if (item.role==='당기') {
+        h += '<div class="tl-card-role"><span class="badge badge-danggi">당기공제</span></div>';
+        h += `<div class="tl-card-amount blue">+${fmt(item.credit)}만</div>`;
+        const yInc = item.danggi.inc.ym+item.danggi.inc.yl;
+        const nInc = item.danggi.inc.nm+item.danggi.inc.nl;
+        h += `<div class="tl-card-detail">청년+${fmtD(yInc)} / 비청년+${fmtD(nInc)}</div>`;
+      } else {
+        h += `<div class="tl-card-role"><span class="badge badge-addtl">${item.role}</span></div>`;
+        h += `<div class="tl-card-amount green">+${fmt(item.credit)}만</div>`;
+        if (item.sahu) h += `<div style="margin-top:4px;">${sahuBadge(item.sahu.type)}</div>`;
+        if (item.chugjing>0) {
+          h += `<div class="tl-card-chug">추징 -${fmt(item.chugjing)}만</div>`;
+          const n = item.credit - item.chugjing;
+          h += `<div class="tl-card-net" style="color:${n>=0?'var(--accent2)':'var(--warn)'};">순 ${fmt(n)}만</div>`;
+        }
+      }
+      h += '</div>';
+    });
+    h += '</div>';
+
+    // Progress bar
+    if (hasAnyCredit) {
+      h += '<div class="tl-progress">';
+      h += '<div class="progress-bar">';
+      h += `<div class="progress-fill ${totalChug>0?'has-chug':''}" style="width:${pct}%">${fmt(net)}만원</div>`;
+      h += '</div>';
+      h += `<div class="progress-label">누적 순공제 ${fmt(net)}만원`;
+      if (totalChug>0) h += ` (공제 ${fmt(totalCredit)}만 - 추징 ${fmt(totalChug)}만)`;
+      h += ` / 최대 ${fmt(maxPossible)}만원 (${maxY}년 완전유지)</div>`;
+      h += '</div>';
     }
-    h += '</tr>';
+
+    h += '</div>';
   });
 
-  // 합계
-  const grandNet = totalCredit - totalChugjing;
-  h += '<tr class="row-total">';
-  h += '<td class="label-cell">합계</td>';
-  h += '<td></td>';
-  h += `<td>${fmt(totalCredit)}</td>`;
-  h += '<td></td>';
-  h += `<td>${totalChugjing > 0 ? '-' + fmt(totalChugjing) : '0'}</td>`;
-  h += `<td>${fmt(grandNet)}</td>`;
-  h += '</tr>';
+  document.getElementById('timelines-area').innerHTML = h;
+}
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 종합 매트릭스
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function renderSummary(all, from, to) {
+  // Collect data: matrix[calendarYear][startYear] = { credit, chugjing }
+  const matrix = {};
+  const startYears = all.map(a => a.startY);
+  const calYearSet = new Set();
+
+  all.forEach(({startY, tl}) => {
+    tl.forEach(item => {
+      if (item.role==='전기' || !item.hasData) return;
+      calYearSet.add(item.year);
+      if (!matrix[item.year]) matrix[item.year] = {};
+      matrix[item.year][startY] = { credit: item.credit, chugjing: item.chugjing };
+    });
+  });
+
+  const calYears = [...calYearSet].sort();
+
+  let h = '<table class="matrix"><thead><tr>';
+  h += '<th>연도</th>';
+  startYears.forEach(sy => h += `<th>${sy}년 시작</th>`);
+  h += '<th>연 합계</th></tr></thead><tbody>';
+
+  const colCredit = {}, colChug = {};
+  startYears.forEach(sy => { colCredit[sy]=0; colChug[sy]=0; });
+  let grandCredit=0, grandChug=0;
+
+  calYears.forEach(cy => {
+    h += '<tr>';
+    h += `<td class="lbl"><strong>${cy}년</strong></td>`;
+    let rowC=0, rowCh=0;
+
+    startYears.forEach(sy => {
+      const d = matrix[cy] && matrix[cy][sy];
+      if (d) {
+        const net = d.credit - d.chugjing;
+        colCredit[sy]+=d.credit; colChug[sy]+=d.chugjing;
+        rowC+=d.credit; rowCh+=d.chugjing;
+        h += '<td>';
+        if (d.credit>0) h += `<div class="cell-credit">${fmt(d.credit)}</div>`;
+        else h += '<div style="color:#ccc;">0</div>';
+        if (d.chugjing>0) h += `<div class="cell-chug">(-${fmt(d.chugjing)})</div>`;
+        h += '</td>';
+      } else {
+        h += '<td></td>';
+      }
+    });
+
+    grandCredit+=rowC; grandChug+=rowCh;
+    const rowNet = rowC - rowCh;
+    h += `<td class="col-total">${fmt(rowNet)}`;
+    if (rowCh>0) h += `<div class="cell-chug">(-${fmt(rowCh)})</div>`;
+    h += '</td></tr>';
+  });
+
+  // Totals row
+  h += '<tr class="row-total"><td class="lbl">합계</td>';
+  startYears.forEach(sy => {
+    const net = colCredit[sy]-colChug[sy];
+    h += `<td>${fmt(net)}`;
+    if (colChug[sy]>0) h += `<br><span style="font-size:11px;opacity:.8;">(-${fmt(colChug[sy])})</span>`;
+    h += '</td>';
+  });
+  const grandNet = grandCredit-grandChug;
+  h += `<td>${fmt(grandNet)}</td></tr>`;
   h += '</tbody></table>';
 
-  // 카드 요약
-  h += '<div class="result-grid" style="margin-top:16px;">';
-  h += resultCard('총 공제액', totalCredit, '당기 + 추가공제', 'blue');
-  if (totalChugjing > 0) {
-    h += resultCard('총 추징액', totalChugjing, '사후관리 추징', 'red');
-  }
-  h += resultCard('순 공제액 (실수령)', grandNet, totalChugjing > 0 ? '공제 - 추징' : '추징 없음', 'highlight');
+  // Highlight
+  h += '<div class="highlight-box">';
+  h += `<div class="label">입력 기간 내 총 순공제액</div>`;
+  h += `<div class="big">${fmt(grandNet)}만원</div>`;
+  if (grandChug>0) h += `<div style="font-size:12px;opacity:.8;margin-top:4px;">총 공제 ${fmt(grandCredit)}만 - 총 추징 ${fmt(grandChug)}만</div>`;
   h += '</div>';
 
   document.getElementById('summary-area').innerHTML = h;
 }
 
-function resultCard(label, val, sub, type) {
-  return `<div class="result-card ${type||''}">
-    <div class="rc-label">${label}</div>
-    <div class="rc-val">${fmt(val)}만원</div>
-    <div class="rc-sub">${sub}</div>
-  </div>`;
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 상세 카드 렌더링
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function renderDetails(results, danggi, corp) {
-  const rate = RATES[corp];
-  const isSmall = (corp === '중소');
-  const hasNormal = (corp !== '대기업');
-  let h = '';
-
-  results.forEach(r => {
-    if (r.roleIdx === 0) return; // 전기 skip
-
-    const cardClass = r.roleIdx === 1 ? 'card-danggi' : 'card-addtl';
-
-    h += `<div class="detail-card ${cardClass}">`;
-    h += `<div class="detail-title">`;
-    h += `<strong>${r.year}년</strong> `;
-    h += `<span class="badge badge-${r.roleIdx===1?'danggi':'addtl'}">${r.role}</span>`;
-    if (r.sahu) h += ' ' + sahuLabel(r.sahu.type);
-    h += '</div>';
-
-    if (r.roleIdx === 1) {
-      // 당기공제 상세
-      h += '<div class="formula-box">';
-      h += `<strong>당기공제 계산</strong> (${r.year}년 vs ${r.year-1}년)<br><br>`;
-      if (isSmall) {
-        h += `청년등 수도권: <code>MAX(0, ${fmtD(r.diff.ym)}) × ${fmt(rate.youth.metro)}만 = ${fmt(danggi.amt.ym)}만원</code><br>`;
-        h += `청년등 비수도권: <code>MAX(0, ${fmtD(r.diff.yl)}) × ${fmt(rate.youth.local)}만 = ${fmt(danggi.amt.yl)}만원</code><br>`;
-        if (hasNormal) {
-          h += `청년등외 수도권: <code>MAX(0, ${fmtD(r.diff.nm)}) × ${fmt(rate.normal.metro)}만 = ${fmt(danggi.amt.nm)}만원</code><br>`;
-          h += `청년등외 비수도권: <code>MAX(0, ${fmtD(r.diff.nl)}) × ${fmt(rate.normal.local)}만 = ${fmt(danggi.amt.nl)}만원</code><br>`;
-        }
-      } else {
-        h += `청년등: <code>MAX(0, ${fmtD(r.diff.ym)}) × ${fmt(rate.youth.metro)}만 = ${fmt(danggi.amt.ym)}만원</code><br>`;
-        if (hasNormal) {
-          h += `청년등외: <code>MAX(0, ${fmtD(r.diff.nm)}) × ${fmt(rate.normal.metro)}만 = ${fmt(danggi.amt.nm)}만원</code><br>`;
-        }
-      }
-      h += `<br><strong>당기공제액: <code>${fmt(danggi.total)}만원</code></strong>`;
-      h += '</div>';
-    } else {
-      // 추가공제 상세
-      if (r.addtl) {
-        h += '<div class="formula-box">';
-        h += `<strong>추가공제 유지확인</strong> (${r.year}년 vs ${results[0].year}년 전기)<br>`;
-        h += `유지 증가분 = MAX(0, ${r.year}년 근로자 - ${results[0].year}년 전기)<br>`;
-        h += `추가공제 = MIN(당기 증가분, 유지 증가분)<br><br>`;
-        if (isSmall) {
-          h += `청년등 수도권: <code>MIN(${fmtD(danggi.inc.ym)}, ${fmtD(r.addtl.kept.ym)}) = ${fmtD(r.addtl.inc.ym)} × ${fmt(rate.youth.metro)}만 = ${fmt(r.addtl.amt.ym)}만원</code><br>`;
-          h += `청년등 비수도권: <code>MIN(${fmtD(danggi.inc.yl)}, ${fmtD(r.addtl.kept.yl)}) = ${fmtD(r.addtl.inc.yl)} × ${fmt(rate.youth.local)}만 = ${fmt(r.addtl.amt.yl)}만원</code><br>`;
-          if (hasNormal) {
-            h += `청년등외 수도권: <code>MIN(${fmtD(danggi.inc.nm)}, ${fmtD(r.addtl.kept.nm)}) = ${fmtD(r.addtl.inc.nm)} × ${fmt(rate.normal.metro)}만 = ${fmt(r.addtl.amt.nm)}만원</code><br>`;
-            h += `청년등외 비수도권: <code>MIN(${fmtD(danggi.inc.nl)}, ${fmtD(r.addtl.kept.nl)}) = ${fmtD(r.addtl.inc.nl)} × ${fmt(rate.normal.local)}만 = ${fmt(r.addtl.amt.nl)}만원</code><br>`;
-          }
-        } else {
-          h += `청년등: <code>MIN(${fmtD(danggi.inc.ym)}, ${fmtD(r.addtl.kept.ym)}) = ${fmtD(r.addtl.inc.ym)} × ${fmt(rate.youth.metro)}만 = ${fmt(r.addtl.amt.ym)}만원</code><br>`;
-          if (hasNormal) {
-            h += `청년등외: <code>MIN(${fmtD(danggi.inc.nm)}, ${fmtD(r.addtl.kept.nm)}) = ${fmtD(r.addtl.inc.nm)} × ${fmt(rate.normal.metro)}만 = ${fmt(r.addtl.amt.nm)}만원</code><br>`;
-          }
-        }
-        h += `<br><strong>추가공제액: <code>${fmt(r.addtl.total)}만원</code></strong>`;
-        h += '</div>';
-      }
-
-      // 사후관리 상세
-      if (r.sahu) {
-        const isWarn = r.sahu.type !== 'ok';
-        const borderC = isWarn ? 'var(--warn)' : 'var(--accent2)';
-        const bgC = isWarn ? '#fdf8f6' : '#f0faf6';
-        const titleC = isWarn ? 'var(--warn)' : 'var(--accent2)';
-        const yearLabel = r.addtlIdx === 1 ? '2차년도 ①' : '3차년도 ②';
-
-        h += `<div class="formula-box" style="border-color:${borderC};background:${bgC};">`;
-        h += `<strong style="color:${titleC};">사후관리 [${yearLabel}]</strong> (${r.year}년 vs ${results[1].year}년 당기)<br>`;
-
-        if (r.sahu.type === 'ok') {
-          h += `감소 없음 → <strong style="color:var(--accent2);">CASE D: 추징 없음</strong>`;
-        } else if (r.sahu.type === 'case_a') {
-          const effYDec = Math.min(r.sahu.yDec, youthW(results[1].danggi.inc));
-          const converted = Math.max(0, effYDec - r.sahu.tDec);
-          h += `<br>전체감소: <code>${fmtD(r.sahu.tDec)}명</code>, 청년감소: <code>${fmtD(r.sahu.yDec)}명</code> (청년감소 ≥ 전체감소)<br>`;
-          h += `전환분(청년→비청년): <code>${fmtD(converted)}명</code> × (청년단가-비청년단가)`;
-          if (r.multiplier > 1) h += ` × ${r.multiplier}회`;
-          h += `<br>`;
-          h += `이탈분: <code>${fmtD(r.sahu.tDec)}명</code> × 청년단가`;
-          if (r.multiplier > 1) h += ` × ${r.multiplier}회`;
-          h += `<br>`;
-          h += `산출액: <code>${fmt(r.sahu.raw)}만원</code>`;
-          if (r.prevChugjing > 0) h += ` - ①기공제 ${fmt(r.prevChugjing)}만`;
-          h += ` (한도: ${fmt(r.limit)}만)<br>`;
-          h += `<strong style="color:var(--warn);">→ 추징: <code>${fmt(r.chugjing)}만원</code></strong>`;
-        } else if (r.sahu.type === 'case_b') {
-          const nDec = Math.max(0, r.sahu.tDec - r.sahu.yDec);
-          h += `<br>전체감소: <code>${fmtD(r.sahu.tDec)}명</code>, 청년감소: <code>${fmtD(r.sahu.yDec)}명</code>, 비청년감소: <code>${fmtD(nDec)}명</code><br>`;
-          h += `청년분 × 청년단가 + 비청년분 × 비청년단가`;
-          if (r.multiplier > 1) h += ` × ${r.multiplier}회`;
-          h += `<br>`;
-          h += `산출액: <code>${fmt(r.sahu.raw)}만원</code>`;
-          if (r.prevChugjing > 0) h += ` - ①기공제 ${fmt(r.prevChugjing)}만`;
-          h += ` (한도: ${fmt(r.limit)}만)<br>`;
-          h += `<strong style="color:var(--warn);">→ 추징: <code>${fmt(r.chugjing)}만원</code></strong>`;
-        } else if (r.sahu.type === 'youth_only') {
-          h += `<br>청년감소: <code>${fmtD(r.sahu.yDec)}명</code> (전체는 유지)<br>`;
-          h += `MIN(청년감소, 당기청년증가) × (청년단가 - 비청년단가)`;
-          if (r.multiplier > 1) h += ` × ${r.multiplier}회`;
-          h += `<br>`;
-          h += `산출액: <code>${fmt(r.sahu.raw)}만원</code>`;
-          if (r.prevChugjing > 0) h += ` - ①기공제 ${fmt(r.prevChugjing)}만`;
-          h += ` (한도: ${fmt(r.limit)}만)<br>`;
-          h += `<strong style="color:var(--warn);">→ 추징: <code>${fmt(r.chugjing)}만원</code></strong>`;
-        }
-        h += '</div>';
-      }
-    }
-
-    h += '</div>';
-  });
-
-  document.getElementById('detail-area').innerHTML = h;
-}
-
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 초기화
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-initStartYearOptions();
-buildInputTable();
-recalc();
+initSelectors();
+buildInput();
+recalcAll();
 </script>
 </body>
 </html>
