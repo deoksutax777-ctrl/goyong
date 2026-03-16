@@ -143,6 +143,19 @@
   .matrix tr.row-total td.lbl { background: var(--accent); color: #fff; }
   .matrix td.col-total { background: var(--accent-light); font-weight: 700; color: var(--accent); }
 
+  /* Formula & verification */
+  .tl-formulas {
+    margin-top: 8px; padding: 10px 14px; font-size: 11px; color: #999; line-height: 1.8;
+    background: #fafafa; border-radius: 6px; border: 1px solid #eee;
+  }
+  .tl-formulas .f-title { color: #888; font-weight: 600; margin-bottom: 2px; }
+  .tl-formulas .f-verify {
+    margin-top: 6px; padding-top: 6px; border-top: 1px solid #e5e5e5;
+  }
+  .tl-formulas code { font-family: var(--mono); background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-size: 10px; }
+  .verify-pass { color: var(--accent2); font-weight: 700; }
+  .verify-fail { color: var(--warn); font-weight: 700; }
+
   .highlight-box {
     background: var(--accent); color: #fff; border-radius: 10px;
     padding: 16px 24px; margin-top: 16px; text-align: center;
@@ -464,6 +477,39 @@ function recalcAll() {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 검증: "처음부터 감소된 상태로 계산" = 실제 순공제
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function calcVerification(tl, danggi, corp, startY) {
+  const r = RATES[corp];
+  const wPrev = getW(startY-1);
+  const dataItems = tl.filter(t => t.hasData && t.role!=='전기');
+  if (dataItems.length <= 1) return null; // 당기만 있으면 검증 불필요
+
+  // 마지막 확인연도 기준
+  const last = dataItems[dataItems.length-1];
+  const wLast = getW(last.year);
+
+  // "처음부터" 유효 증가분 = MIN(당기증가, MAX(0, 최종연도-전기))
+  const effDiff = diffW(wLast, wPrev);
+  const effInc = {
+    ym: Math.min(danggi.inc.ym, Math.max(0, effDiff.ym)),
+    yl: Math.min(danggi.inc.yl, Math.max(0, effDiff.yl)),
+    nm: Math.min(danggi.inc.nm, Math.max(0, effDiff.nm)),
+    nl: Math.min(danggi.inc.nl, Math.max(0, effDiff.nl))
+  };
+
+  const fsPerYear = effInc.ym*r.youth.metro + effInc.yl*r.youth.local
+                  + effInc.nm*r.normal.metro + effInc.nl*r.normal.local;
+  const numY = dataItems.length;
+  const fsTotal = fsPerYear * numY;
+  const actualNet = dataItems.reduce((s,t) => s + t.credit - t.chugjing, 0);
+  const match = Math.abs(fsTotal - actualNet) < 0.5;
+  const totalEffInc = effInc.ym + effInc.yl + effInc.nm + effInc.nl;
+
+  return { effInc, totalEffInc, fsPerYear, fsTotal, actualNet, numY, match, lastYear: last.year };
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 타임라인 카드 렌더링
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function renderTimelines(all) {
@@ -534,6 +580,55 @@ function renderTimelines(all) {
       h += `<div class="progress-label">누적 순공제 ${fmt(net)}만원`;
       if (totalChug>0) h += ` (공제 ${fmt(totalCredit)}만 - 추징 ${fmt(totalChug)}만)`;
       h += ` / 최대 ${fmt(maxPossible)}만원 (${maxY}년 완전유지)</div>`;
+      h += '</div>';
+    }
+
+    // 산식 + 검증
+    if (hasAnyCredit) {
+      h += '<div class="tl-formulas">';
+      h += '<div class="f-title">산식</div>';
+
+      // 당기 산식
+      const yI = danggi.inc.ym+danggi.inc.yl, nI = danggi.inc.nm+danggi.inc.nl;
+      h += `당기(${startY}): 청년+${fmtD(yI)}명 × 청년단가 + 비청년+${fmtD(nI)}명 × 비청년단가 = <code>${fmt(danggi.total)}만</code><br>`;
+
+      // 추가공제 산식
+      tl.forEach(item => {
+        if (!item.hasData || item.role==='전기' || item.role==='당기') return;
+        h += `${item.role}(${item.year}): `;
+        if (item.addtl) {
+          const kY = item.addtl.inc.ym+item.addtl.inc.yl, kN = item.addtl.inc.nm+item.addtl.inc.nl;
+          h += `유지확인 MIN(당기증가, ${item.year}-전기) → 청년${fmtD(kY)}+비청년${fmtD(kN)} = <code>${fmt(item.credit)}만</code>`;
+        }
+        if (item.sahu && item.sahu.type!=='ok') {
+          h += ` | 사후관리(${item.sahu.type}): 산출<code>${fmt(item.sahu.raw)}만</code>`;
+          if (item.prevChug>0) h += `-①<code>${fmt(item.prevChug)}만</code>`;
+          h += ` (한도${fmt(item.limit)}만) → 추징<code>${fmt(item.chugjing)}만</code>`;
+        } else if (item.sahu) {
+          h += ' | 사후관리: 정상';
+        }
+        h += '<br>';
+      });
+
+      // 검증
+      const v = calcVerification(tl, danggi, corp, startY);
+      if (v) {
+        h += '<div class="f-verify">';
+        h += '<div class="f-title">검증 ("처음부터 감소 상태로 계산")</div>';
+        h += `${v.lastYear}년 기준 유효증가: <code>${fmtD(v.totalEffInc)}명</code> → `;
+        h += `연 <code>${fmt(v.fsPerYear)}만</code> × ${v.numY}년 = <code>${fmt(v.fsTotal)}만</code><br>`;
+        h += `실제 순공제 합계: <code>${fmt(v.actualNet)}만</code><br>`;
+        if (v.match) {
+          h += `<span class="verify-pass">&#10003; 검증 통과</span> (${fmt(v.fsTotal)}만 = ${fmt(v.actualNet)}만)`;
+        } else {
+          const diff = v.fsTotal - v.actualNet;
+          h += `<span class="verify-fail">&#10007; 불일치</span> (차이: ${fmt(diff)}만`;
+          if (diff > 0) h += ' - 중간연도 추가추징 미환급분 추정';
+          h += ')';
+        }
+        h += '</div>';
+      }
+
       h += '</div>';
     }
 
