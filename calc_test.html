@@ -236,7 +236,7 @@ const RATES = {
 };
 
 let saved = {};
-let axisFlipped = false;
+let axisFlipped = true;
 
 function fmt(n) { return n.toLocaleString('ko-KR'); }
 function fmtD(n) { return Number.isInteger(n) ? n.toString() : n.toFixed(2); }
@@ -508,7 +508,7 @@ let lastAll, lastFrom, lastTo;
 
 function toggleAxis() {
   axisFlipped = !axisFlipped;
-  document.getElementById('axis-toggle').textContent = axisFlipped ? '행=시작연도 | 축 전환' : '행=과세연도 | 축 전환';
+  document.getElementById('axis-toggle').textContent = axisFlipped ? '행=시작연도 | 축 전환' : '행=과세연도 | 축전환';
   if (lastAll) renderSummary(lastAll, lastFrom, lastTo);
 }
 
