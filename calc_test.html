@@ -212,9 +212,13 @@
   </div>
 
   <div class="panel">
-    <div class="panel-header">&#128203; 상시근로자수 입력</div>
+    <div class="panel-header" style="justify-content:space-between;">
+      <span>&#128203; 상시근로자수 입력</span>
+      <button onclick="loadFromSpec()" style="background:var(--accent);color:#fff;border:none;border-radius:5px;padding:5px 14px;font-size:11px;font-weight:600;cursor:pointer;">명세서에서 가져오기</button>
+    </div>
     <div class="panel-body">
       <p style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">시작연도별 상시근로자수를 입력하세요. <strong>25년 이전 시작 → 종전 규정</strong>, <strong>25년부터 시작 → 개정 규정</strong>으로 산출한 상시근로자수를 각각 입력합니다.</p>
+      <div id="load-status" style="display:none;margin-bottom:8px;padding:8px 12px;border-radius:6px;font-size:11px;"></div>
       <div id="input-area"></div>
     </div>
   </div>
@@ -845,6 +849,62 @@ function renderSummary(all, from, to) {
   h += '</div>';
 
   document.getElementById('summary-area').innerHTML = h;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 명세서 데이터 가져오기
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function loadFromSpec() {
+  const corp=getCorp(), from=getFrom(), to=getTo();
+  const isS=(corp==='중소'), maxY=RATES[corp].years;
+  const starts=[]; for(let y=from+1; y<=to; y++) starts.push(y);
+
+  let filled=0, missing=[];
+
+  starts.forEach(startY => {
+    const regType = startY < 2025 ? 'old' : 'new';
+    const yearsNeeded = [];
+    for(let i=-1; i<maxY; i++) yearsNeeded.push(startY+i);
+
+    yearsNeeded.forEach(y => {
+      const key = 'goyong_' + regType + '_' + y;
+      const raw = localStorage.getItem(key);
+      if(!raw) { missing.push(y+'년('+( regType==='old'?'종전':'개정')+')'); return; }
+
+      const d = JSON.parse(raw);
+      // 청년 → 수도권(ym)에, 비청년 → 수도권(nm)에 넣기 (중소는 사용자가 비수도권으로 재배분)
+      const ymEl = document.getElementById('w'+startY+'-'+y+'-ym');
+      const nmEl = document.getElementById('w'+startY+'-'+y+'-nm');
+      if(ymEl) { ymEl.value = d.youthWorkerCount; filled++; }
+      if(nmEl) { nmEl.value = d.nonYouthWorkerCount; filled++; }
+      // 비수도권은 0으로 초기화
+      if(isS) {
+        const ylEl = document.getElementById('w'+startY+'-'+y+'-yl');
+        const nlEl = document.getElementById('w'+startY+'-'+y+'-nl');
+        if(ylEl) ylEl.value = 0;
+        if(nlEl) nlEl.value = 0;
+      }
+    });
+  });
+
+  // 상태 메시지 표시
+  const statusEl = document.getElementById('load-status');
+  statusEl.style.display = 'block';
+  if(filled > 0 && missing.length === 0) {
+    statusEl.style.background = 'var(--accent2-light)';
+    statusEl.style.color = 'var(--accent2)';
+    statusEl.innerHTML = '명세서 데이터를 모두 가져왔습니다.' + (isS ? ' <strong>중소기업</strong>: 전체 인원이 수도권에 입력되었습니다. 비수도권이 있으면 직접 배분해주세요.' : '');
+  } else if(filled > 0) {
+    statusEl.style.background = 'var(--orange-light)';
+    statusEl.style.color = '#856404';
+    statusEl.innerHTML = '일부 데이터를 가져왔습니다. 누락: ' + [...new Set(missing)].join(', ') + ' → 해당 연도 명세서를 먼저 계산해주세요.';
+  } else {
+    statusEl.style.background = 'var(--warn-light)';
+    statusEl.style.color = 'var(--warn)';
+    statusEl.innerHTML = '명세서 데이터가 없습니다. 먼저 명세서 페이지에서 계산을 실행해주세요.';
+  }
+
+  recalcAll();
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

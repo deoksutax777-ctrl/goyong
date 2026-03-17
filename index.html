@@ -1258,6 +1258,18 @@ function calculate() {
 
   window._lastResult = { curProcessed, prevProcessed, curAgg, prevAgg, taxYear };
   document.getElementById('btn-excel').disabled = false;
+
+  // localStorage에 저장 → calc_test.html 연동용
+  localStorage.setItem('goyong_new_' + taxYear, JSON.stringify({
+    workerCount: curAgg.workerCount,
+    youthWorkerCount: curAgg.youthWorkerCount,
+    nonYouthWorkerCount: curAgg.nonYouthWorkerCount
+  }));
+  localStorage.setItem('goyong_new_' + prevYear, JSON.stringify({
+    workerCount: prevAgg.workerCount,
+    youthWorkerCount: prevAgg.youthWorkerCount,
+    nonYouthWorkerCount: prevAgg.nonYouthWorkerCount
+  }));
 }
 
 // 오버라이드 토글 (테이블에서 호출)
