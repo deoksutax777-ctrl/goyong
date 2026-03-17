@@ -214,7 +214,7 @@
   <div class="panel">
     <div class="panel-header">&#128203; 상시근로자수 입력</div>
     <div class="panel-body">
-      <p style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">연도별 상시근로자수를 입력하면 가능한 모든 시작연도의 세액공제가 자동 계산됩니다.</p>
+      <p style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">시작연도별 상시근로자수를 입력하세요. <strong>25년 이전 시작 → 종전 규정</strong>, <strong>25년부터 시작 → 개정 규정</strong>으로 산출한 상시근로자수를 각각 입력합니다.</p>
       <div id="input-area"></div>
     </div>
   </div>
@@ -251,15 +251,17 @@ const RATES = {
 let saved = {};
 let axisFlipped = true;
 
-function fmt(n) { return n.toLocaleString('ko-KR'); }
+function fmt(n) { return Math.floor(n).toLocaleString('ko-KR'); }
 function fmtD(n) { return Number.isInteger(n) ? n.toString() : n.toFixed(2); }
+function truncW(n) { return Math.floor(n * 100) / 100; }  // 인원: 소수점 2자리 버림
+function truncAmt(n) { return Math.floor(n); }             // 금액(만원): 0원이하 버림
 function getCorp() { return document.getElementById('corp-type').value; }
 function getFrom() { return +document.getElementById('year-from').value; }
 function getTo() { return +document.getElementById('year-to').value; }
 
-function getW(y) {
+function getW(startY, y) {
   const g = id => { const el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; };
-  return { ym: g('w'+y+'-ym'), yl: g('w'+y+'-yl'), nm: g('w'+y+'-nm'), nl: g('w'+y+'-nl') };
+  return { ym: g('w'+startY+'-'+y+'-ym'), yl: g('w'+startY+'-'+y+'-yl'), nm: g('w'+startY+'-'+y+'-nm'), nl: g('w'+startY+'-'+y+'-nl') };
 }
 function totalW(w) { return w.ym + w.yl + w.nm + w.nl; }
 function youthW(w) { return w.ym + w.yl; }
@@ -270,20 +272,41 @@ function maxZ(w) { return { ym: Math.max(0,w.ym), yl: Math.max(0,w.yl), nm: Math
 // 당기공제
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function calcDanggi(corp, diff) {
-  const r = RATES[corp], inc = maxZ(diff);
-  const amt = { ym: inc.ym*r.youth.metro, yl: inc.yl*r.youth.local, nm: inc.nm*r.normal.metro, nl: inc.nl*r.normal.local };
+  const r = RATES[corp], rawInc = maxZ(diff);
+  // 전체 증가인원 cap (청년 우선 배정)
+  const totalDiff = diff.ym + diff.yl + diff.nm + diff.nl;
+  const totalCap = Math.max(0, totalDiff);
+  const yT = rawInc.ym + rawInc.yl, nT = rawInc.nm + rawInc.nl;
+  const capY = Math.min(yT, totalCap);
+  const capN = Math.min(nT, totalCap - capY);
+  const yR = yT > 0 ? capY / yT : 0, nR = nT > 0 ? capN / nT : 0;
+  const inc = { ym: truncW(rawInc.ym*yR), yl: truncW(rawInc.yl*yR), nm: truncW(rawInc.nm*nR), nl: truncW(rawInc.nl*nR) };
+  const amt = { ym: truncAmt(inc.ym*r.youth.metro), yl: truncAmt(inc.yl*r.youth.local), nm: truncAmt(inc.nm*r.normal.metro), nl: truncAmt(inc.nl*r.normal.local) };
   return { inc, amt, total: amt.ym+amt.yl+amt.nm+amt.nl };
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 추가공제 (유지확인)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function calcAddtl(corp, danggiInc, wCheck, wPrev) {
+function calcAddtl(corp, danggiInc, wCheck, wPrev, wDanggi) {
   const r = RATES[corp];
   const kept = maxZ(diffW(wCheck, wPrev));
-  const inc = { ym: Math.min(danggiInc.ym,kept.ym), yl: Math.min(danggiInc.yl,kept.yl), nm: Math.min(danggiInc.nm,kept.nm), nl: Math.min(danggiInc.nl,kept.nl) };
-  const amt = { ym: inc.ym*r.youth.metro, yl: inc.yl*r.youth.local, nm: inc.nm*r.normal.metro, nl: inc.nl*r.normal.local };
-  return { kept, inc, amt, total: amt.ym+amt.yl+amt.nm+amt.nl };
+  // 청년 감소 여부: 확인연도 청년 < 당기 청년
+  const youthDec = wDanggi && (youthW(wCheck) < youthW(wDanggi));
+  let inc, amt;
+  if (youthDec) {
+    // 청년 감소 시: 유지인원을 당기증가 비율로 배분, 모두 비청년 단가 적용
+    const dTotal = danggiInc.ym + danggiInc.yl + danggiInc.nm + danggiInc.nl;
+    const totalKept = Math.max(0, totalW(wCheck) - totalW(wPrev));
+    const maintained = Math.min(dTotal, totalKept);
+    const scale = dTotal > 0 ? maintained / dTotal : 0;
+    inc = { ym: truncW(danggiInc.ym*scale), yl: truncW(danggiInc.yl*scale), nm: truncW(danggiInc.nm*scale), nl: truncW(danggiInc.nl*scale) };
+    amt = { ym: truncAmt(inc.ym*r.normal.metro), yl: truncAmt(inc.yl*r.normal.local), nm: truncAmt(inc.nm*r.normal.metro), nl: truncAmt(inc.nl*r.normal.local) };
+  } else {
+    inc = { ym: truncW(Math.min(danggiInc.ym,kept.ym)), yl: truncW(Math.min(danggiInc.yl,kept.yl)), nm: truncW(Math.min(danggiInc.nm,kept.nm)), nl: truncW(Math.min(danggiInc.nl,kept.nl)) };
+    amt = { ym: truncAmt(inc.ym*r.youth.metro), yl: truncAmt(inc.yl*r.youth.local), nm: truncAmt(inc.nm*r.normal.metro), nl: truncAmt(inc.nl*r.normal.local) };
+  }
+  return { kept, inc, amt, total: amt.ym+amt.yl+amt.nm+amt.nl, youthDec };
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -357,7 +380,7 @@ function sahuCheck(corp, wD, wC, dInc, mult) {
     }
   }
 
-  raw *= mult;
+  raw = truncAmt(raw * mult);
   return { type, raw, yDec, tDec };
 }
 
@@ -389,29 +412,62 @@ function onSettingsChange() { saveVals(); buildInput(); restoreVals(); recalcAll
 function buildInput() {
   const corp=getCorp(), from=getFrom(), to=getTo();
   const isS=(corp==='중소'), hasN=(corp!=='대기업');
+  const maxY=RATES[corp].years;
   if (to<=from) { document.getElementById('input-area').innerHTML='<p style="color:var(--warn);">종료연도가 시작연도보다 커야 합니다.</p>'; return; }
 
   const starts = []; for (let y=from+1; y<=to; y++) starts.push(y);
   document.getElementById('info-text').textContent = `입력: ${from}~${to}년 → 시작연도: ${starts.join(', ')}년`;
 
-  let h='<table class="input-table"><thead><tr>';
-  h+='<th rowspan="2" style="width:80px;">연도</th>';
-  h+=`<th colspan="${isS?2:1}" class="y-hdr">청년등</th>`;
-  if(hasN) h+=`<th colspan="${isS?2:1}" class="n-hdr">청년등외</th>`;
-  h+='</tr><tr>';
-  h+=`<th class="y-hdr">${isS?'수도권':'전체'}</th>`;
-  if(isS) h+='<th class="y-hdr">비수도권</th>';
-  if(hasN) { h+=`<th class="n-hdr">${isS?'수도권':'전체'}</th>`; if(isS) h+='<th class="n-hdr">비수도권</th>'; }
-  h+='</tr></thead><tbody>';
+  let h='';
+  starts.forEach(startY => {
+    const isOldRule = startY < 2025;
+    const ruleLabel = isOldRule ? '종전 규정' : '개정 규정';
+    const ruleDesc = isOldRule
+      ? '(총 근무개월수 합계 ÷ 12)'
+      : '(인별 근무개월수÷12 → 0.01미만 버림 후 합산)';
+    const ruleBadge = isOldRule
+      ? '<span class="badge badge-warn">종전 규정</span>'
+      : '<span class="badge badge-ok">개정 규정</span>';
 
-  for (let y=from; y<=to; y++) {
-    h+=`<tr><td class="lbl"><strong>${y}년</strong></td>`;
-    h+=`<td><input type="number" id="w${y}-ym" step="0.01" value="0" oninput="recalcAll()"></td>`;
-    if(isS) h+=`<td><input type="number" id="w${y}-yl" step="0.01" value="0" oninput="recalcAll()"></td>`;
-    if(hasN) { h+=`<td><input type="number" id="w${y}-nm" step="0.01" value="0" oninput="recalcAll()"></td>`; if(isS) h+=`<td><input type="number" id="w${y}-nl" step="0.01" value="0" oninput="recalcAll()"></td>`; }
-    h+='</tr>';
-  }
-  h+='</tbody></table>';
+    // 이 타임라인에 필요한 연도: 전기(startY-1) ~ 마지막 추가(startY+maxY-1)
+    const yearsNeeded = [];
+    for (let i=-1; i<maxY; i++) yearsNeeded.push(startY+i);
+
+    h+=`<div style="margin-bottom:18px;padding:12px;border:1px solid var(--border);border-radius:8px;background:${isOldRule?'#fffbf0':'#f0faf6'};">`;
+    h+=`<div style="font-size:13px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">`;
+    h+=`<span class="tl-title-badge">${startY}년 시작</span>`;
+    h+=ruleBadge;
+    h+=`<span style="font-size:11px;color:var(--text-muted);">상시근로자 수 판단: ${ruleLabel} ${ruleDesc}</span>`;
+    h+=`</div>`;
+
+    h+='<table class="input-table"><thead><tr>';
+    h+='<th rowspan="2" style="width:70px;">연도</th>';
+    h+='<th rowspan="2" style="width:50px;">역할</th>';
+    h+=`<th colspan="${isS?2:1}" class="y-hdr">청년등</th>`;
+    if(hasN) h+=`<th colspan="${isS?2:1}" class="n-hdr">청년등외</th>`;
+    h+='</tr><tr>';
+    h+=`<th class="y-hdr">${isS?'수도권':'전체'}</th>`;
+    if(isS) h+='<th class="y-hdr">비수도권</th>';
+    if(hasN) { h+=`<th class="n-hdr">${isS?'수도권':'전체'}</th>`; if(isS) h+='<th class="n-hdr">비수도권</th>'; }
+    h+='</tr></thead><tbody>';
+
+    yearsNeeded.forEach((y, idx) => {
+      let role='';
+      if(idx===0) role='전기';
+      else if(idx===1) role='당기';
+      else role=(idx-1)+'차추가';
+
+      h+=`<tr><td class="lbl"><strong>${y}년</strong></td>`;
+      h+=`<td style="font-size:11px;color:var(--text-muted);">${role}</td>`;
+      h+=`<td><input type="number" id="w${startY}-${y}-ym" step="0.01" value="0" oninput="recalcAll()"></td>`;
+      if(isS) h+=`<td><input type="number" id="w${startY}-${y}-yl" step="0.01" value="0" oninput="recalcAll()"></td>`;
+      if(hasN) { h+=`<td><input type="number" id="w${startY}-${y}-nm" step="0.01" value="0" oninput="recalcAll()"></td>`; if(isS) h+=`<td><input type="number" id="w${startY}-${y}-nl" step="0.01" value="0" oninput="recalcAll()"></td>`; }
+      h+='</tr>';
+    });
+
+    h+='</tbody></table></div>';
+  });
+
   document.getElementById('input-area').innerHTML = h;
 }
 
@@ -420,9 +476,8 @@ function buildInput() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function calcTimeline(startY) {
   const corp=getCorp(), r=RATES[corp], maxY=r.years;
-  const from=getFrom(), to=getTo();
   const prev=startY-1;
-  const wPrev=getW(prev), wDanggi=getW(startY);
+  const wPrev=getW(startY, prev), wDanggi=getW(startY, startY);
   const diff=diffW(wDanggi, wPrev);
   const danggi=calcDanggi(corp, diff);
 
@@ -432,29 +487,23 @@ function calcTimeline(startY) {
 
   for (let i=1; i<maxY; i++) {
     const cy = startY+i;
-    const hasData = cy>=from && cy<=to;
 
-    if (!hasData) {
-      tl.push({ year:cy, role:i+'차 추가', credit:0, chugjing:0, sahu:null, hasData:false, idx:i });
-      continue;
-    }
-
-    const wC=getW(cy);
-    const addtl=calcAddtl(corp, danggi.inc, wC, wPrev);
+    const wC=getW(startY, cy);
+    const addtl=calcAddtl(corp, danggi.inc, wC, wPrev, wDanggi);
     const credit=addtl.total;
     let sahu, chugjing=0, limit=0, mult=1, prevChug=0;
 
     if (i===1) {
       mult=1; limit=danggi.total;
       sahu=sahuCheck(corp, wDanggi, wC, danggi.inc, mult);
-      chugjing=Math.min(sahu.raw, limit);
+      chugjing=truncAmt(Math.min(sahu.raw, limit));
     } else if (i===2) {
       const p=tl[tl.length-1];
       const cnt=(danggi.total>0?1:0)+((p.hasData&&p.credit>0)?1:0);
       mult=cnt; limit=danggi.total+(p.hasData?p.credit:0);
       prevChug=p.hasData?p.chugjing:0;
       sahu=sahuCheck(corp, wDanggi, wC, danggi.inc, mult);
-      chugjing=Math.min(Math.max(0, sahu.raw-prevChug), limit);
+      chugjing=truncAmt(Math.min(Math.max(0, sahu.raw-prevChug), Math.max(0, limit-prevChug)));
     }
 
     tl.push({ year:cy, role:i+'차 추가', credit, chugjing, sahu, hasData:true, addtl, idx:i, limit, mult, prevChug });
@@ -481,32 +530,58 @@ function recalcAll() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function calcVerification(tl, danggi, corp, startY) {
   const r = RATES[corp];
-  const wPrev = getW(startY-1);
+  const wPrev = getW(startY, startY-1);
   const dataItems = tl.filter(t => t.hasData && t.role!=='전기');
   if (dataItems.length <= 1) return null; // 당기만 있으면 검증 불필요
 
   // 마지막 확인연도 기준
   const last = dataItems[dataItems.length-1];
-  const wLast = getW(last.year);
+  const wLast = getW(startY, last.year);
 
   // "처음부터" 유효 증가분 = MIN(당기증가, MAX(0, 최종연도-전기))
   const effDiff = diffW(wLast, wPrev);
-  const effInc = {
+  const wDanggi = getW(startY, startY);
+  // 최종연도 기준 청년 감소 여부 (당기 대비)
+  const youthDec = youthW(wLast) < youthW(wDanggi);
+
+  // 전체인원 cap 적용
+  const totalEffDiff = Math.max(0, totalW(wLast) - totalW(wPrev));
+  const rawEffInc = {
     ym: Math.min(danggi.inc.ym, Math.max(0, effDiff.ym)),
     yl: Math.min(danggi.inc.yl, Math.max(0, effDiff.yl)),
     nm: Math.min(danggi.inc.nm, Math.max(0, effDiff.nm)),
     nl: Math.min(danggi.inc.nl, Math.max(0, effDiff.nl))
   };
 
-  const fsPerYear = effInc.ym*r.youth.metro + effInc.yl*r.youth.local
-                  + effInc.nm*r.normal.metro + effInc.nl*r.normal.local;
+  let effInc;
+  if (youthDec) {
+    // 청년 감소 시: 유지인원을 당기증가 비율로 배분
+    const dTotal = danggi.inc.ym + danggi.inc.yl + danggi.inc.nm + danggi.inc.nl;
+    const maintained = Math.min(dTotal, totalEffDiff);
+    const scale = dTotal > 0 ? maintained / dTotal : 0;
+    effInc = { ym: truncW(danggi.inc.ym*scale), yl: truncW(danggi.inc.yl*scale), nm: truncW(danggi.inc.nm*scale), nl: truncW(danggi.inc.nl*scale) };
+  } else {
+    // 전체 cap 적용
+    const sumRaw = rawEffInc.ym + rawEffInc.yl + rawEffInc.nm + rawEffInc.nl;
+    if (sumRaw > totalEffDiff && totalEffDiff >= 0) {
+      const s = sumRaw > 0 ? totalEffDiff / sumRaw : 0;
+      effInc = { ym: truncW(rawEffInc.ym*s), yl: truncW(rawEffInc.yl*s), nm: truncW(rawEffInc.nm*s), nl: truncW(rawEffInc.nl*s) };
+    } else {
+      effInc = rawEffInc;
+    }
+  }
+
+  // 청년 감소 시 비청년 단가, 아니면 정상 단가
+  const yR = youthDec ? r.normal : r.youth;
+  const fsPerYear = truncAmt(effInc.ym*yR.metro) + truncAmt(effInc.yl*yR.local)
+                  + truncAmt(effInc.nm*r.normal.metro) + truncAmt(effInc.nl*r.normal.local);
   const numY = dataItems.length;
   const fsTotal = fsPerYear * numY;
   const actualNet = dataItems.reduce((s,t) => s + t.credit - t.chugjing, 0);
   const match = Math.abs(fsTotal - actualNet) < 0.5;
   const totalEffInc = effInc.ym + effInc.yl + effInc.nm + effInc.nl;
 
-  return { effInc, totalEffInc, fsPerYear, fsTotal, actualNet, numY, match, lastYear: last.year };
+  return { effInc, totalEffInc, fsPerYear, fsTotal, actualNet, numY, match, lastYear: last.year, youthDec };
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -547,7 +622,7 @@ function renderTimelines(all) {
       if (item.role==='전기') {
         h += '<div class="tl-card-role"><span class="badge badge-prev">전기</span></div>';
         h += '<div class="tl-card-amount" style="color:var(--text-muted);">기준</div>';
-        h += `<div class="tl-card-detail">전체 ${fmtD(totalW(getW(item.year)))}명</div>`;
+        h += `<div class="tl-card-detail">전체 ${fmtD(totalW(getW(startY, item.year)))}명</div>`;
       } else if (!item.hasData) {
         h += `<div class="tl-card-role"><span class="badge badge-na">${item.role}</span></div>`;
         h += '<div class="tl-card-amount" style="color:#ccc;">미입력</div>';
@@ -560,6 +635,7 @@ function renderTimelines(all) {
       } else {
         h += `<div class="tl-card-role"><span class="badge badge-addtl">${item.role}</span></div>`;
         h += `<div class="tl-card-amount green">+${fmt(item.credit)}만</div>`;
+        if (item.addtl && item.addtl.youthDec) h += `<div style="margin-top:2px;"><span class="badge badge-warn">청년감소→비청년단가</span></div>`;
         if (item.sahu) h += `<div style="margin-top:4px;">${sahuBadge(item.sahu.type)}</div>`;
         if (item.chugjing>0) {
           h += `<div class="tl-card-chug">추징 -${fmt(item.chugjing)}만</div>`;
@@ -619,13 +695,15 @@ function renderTimelines(all) {
         if (!item.hasData || item.role==='전기' || item.role==='당기') return;
         h += `${item.role}(${item.year}): `;
         if (item.addtl) {
+          if (item.addtl.youthDec) h += `<span style="color:var(--warn);font-weight:600;">⚠ 청년감소→비청년단가</span> `;
+          const yRate = item.addtl.youthDec ? rt.normal : rt.youth;
           if (isS) {
-            h += `유지 → 청년 수도권${fmtD(item.addtl.inc.ym)}×${fmt(rt.youth.metro)} + 비수도권${fmtD(item.addtl.inc.yl)}×${fmt(rt.youth.local)}`;
+            h += `유지 → 청년 수도권${fmtD(item.addtl.inc.ym)}×${fmt(yRate.metro)} + 비수도권${fmtD(item.addtl.inc.yl)}×${fmt(yRate.local)}`;
             if (hasN) h += ` + 비청년 수도권${fmtD(item.addtl.inc.nm)}×${fmt(rt.normal.metro)} + 비수도권${fmtD(item.addtl.inc.nl)}×${fmt(rt.normal.local)}`;
             h += ` = <code>${fmt(item.credit)}만</code>`;
           } else {
             const kY = item.addtl.inc.ym+item.addtl.inc.yl, kN = item.addtl.inc.nm+item.addtl.inc.nl;
-            h += `유지 → 청년${fmtD(kY)}×${fmt(rt.youth.metro)}`;
+            h += `유지 → 청년${fmtD(kY)}×${fmt(yRate.metro)}`;
             if (hasN) h += ` + 비청년${fmtD(kN)}×${fmt(rt.normal.metro)}`;
             h += ` = <code>${fmt(item.credit)}만</code>`;
           }
@@ -645,6 +723,7 @@ function renderTimelines(all) {
       if (v) {
         h += '<div class="f-verify">';
         h += '<div class="f-title">검증 ("처음부터 감소 상태로 계산")</div>';
+        if (v.youthDec) h += `<span style="color:var(--warn);">※ 청년감소 → 비청년단가 적용</span><br>`;
         h += `${v.lastYear}년 기준 유효증가: <code>${fmtD(v.totalEffInc)}명</code> → `;
         h += `연 <code>${fmt(v.fsPerYear)}만</code> × ${v.numY}년 = <code>${fmt(v.fsTotal)}만</code><br>`;
         h += `실제 순공제 합계: <code>${fmt(v.actualNet)}만</code><br>`;
