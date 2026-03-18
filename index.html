@@ -936,6 +936,7 @@ function processEmployees(employees, taxYear, corpType) {
     let isYouthYear = false, isYouthHire = false, youthExclude = '';
     let isDisabled = false;
     let elderlyAtHire = false;
+    let isPreAmendYouth = false; // 2025년 이전 계약자의 매월말 기준 청년 해당 여부 (내부 계산용)
     const isPreAmendContract = hireDate && hireDate < new Date(2025, 0, 1);
 
     if (birthDate) {
@@ -943,22 +944,19 @@ function processEmployees(employees, taxYear, corpType) {
       isDisabled = emp.disabled > 0;
       elderlyAtHire = hireDate ? isElderlyAtHire(birthDate, hireDate) : false;
 
-
-      // 2025년 이전 근로계약 체결자: 근로계약체결일 기준 청년여부 미적용
-      // → 매월 말일 기준 나이로 청년 여부 판정 (월별로 청년/비청년 분리)
       if (isPreAmendContract) {
-        // 매월말 기준 판정: 근무 기간 중 한 달이라도 청년(15~34세)이면 Y
-        // (실제 청년 개월수는 potentialYouthMonths에서 월별로 정확히 계산)
-        let anyYouthMonth = false;
+        // 2025년 이전 계약자: ㉖근로계약체결일기준 청년여부 = N (미적용)
+        // 대신 매월 말일 기준으로 청년 개월수를 내부적으로 계산
+        isYouthHire = false;
         if (months > 0) {
           for (let m = startM; m <= endM; m++) {
             const mEnd = new Date(taxYear, m - 1 + 1, 0);
             const age = getAgeAt(birthDate, mEnd);
-            if (age >= 15 && age <= 34) { anyYouthMonth = true; break; }
+            if (age >= 15 && age <= 34) { isPreAmendYouth = true; break; }
           }
         }
-        isYouthHire = anyYouthMonth;
       } else {
+        // 2025.1.1 이후 계약자: 근로계약체결일 기준 청년 판정
         isYouthHire = hireDate ? isYouthAtHire(birthDate, hireDate) : false;
         if (isYouthHire) {
           youthExclude = calcYouthExclude(birthDate, hireDate, corpType, taxYear);
@@ -972,9 +970,9 @@ function processEmployees(employees, taxYear, corpType) {
 
     if (months > 0) {
       potentialRegularMonths = months;
-      // 청년등: 청년(근로계약체결일 기준) or 장애인 or 고령자(근로계약체결일 기준)
-      if (isYouthHire || isDisabled || elderlyAtHire) {
-        if (isPreAmendContract && !isDisabled && !elderlyAtHire) {
+      // 청년등: 청년(근로계약체결일 기준 또는 매월말 기준) or 장애인 or 고령자(근로계약체결일 기준)
+      if (isYouthHire || isPreAmendYouth || isDisabled || elderlyAtHire) {
+        if (isPreAmendContract && isPreAmendYouth && !isDisabled && !elderlyAtHire) {
           // 2025년 이전 계약자: 매월 말일 기준으로 청년 여부 판정하여 청년인 달만 카운트
           let youthMonthCount = 0;
           for (let m = startM; m <= endM; m++) {
