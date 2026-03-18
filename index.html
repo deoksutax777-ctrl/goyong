@@ -936,6 +936,7 @@ function processEmployees(employees, taxYear, corpType) {
     let isYouthYear = false, isYouthHire = false, youthExclude = '';
     let isDisabled = false;
     let elderlyAtHire = false;
+    const isPreAmendContract = hireDate && hireDate < new Date(2025, 0, 1);
 
     if (birthDate) {
       isYouthYear = isYouthAtYear(birthDate, taxYear);
@@ -945,7 +946,6 @@ function processEmployees(employees, taxYear, corpType) {
 
       // 2025년 이전 근로계약 체결자: 근로계약체결일 기준 청년여부 미적용
       // → 매월 말일 기준 나이로 청년 여부 판정 (월별로 청년/비청년 분리)
-      const isPreAmendContract = hireDate && hireDate < new Date(2025, 0, 1);
       if (isPreAmendContract) {
         // 매월말 기준 판정: 근무 기간 중 한 달이라도 청년(15~34세)이면 Y
         // (실제 청년 개월수는 potentialYouthMonths에서 월별로 정확히 계산)
