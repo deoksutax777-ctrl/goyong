@@ -550,6 +550,9 @@ let ynEdits = {};
 // 단시간근로자유형 편집: { 'cur:사원코드': '0.5'|'0.75'|'' }
 let shortTimeEdits = {};
 
+// 상시근로자 제외사유 편집: { 'cur:사원코드': '임원'|'친족'|'기타'|'' }
+let reasonEdits = {};
+
 // 수도권 부서·임원 직급 — 파일 업로드 시 자동 감지 후 덮어씀
 // 사용자가 체크박스를 바꾸면 그 상태가 유지됨
 let metroDepts = new Set();
@@ -883,12 +886,16 @@ function isYouthAtHire(birthDate, hireDate) {
 // 청년 제외시점 계산:
 //   아래 둘 중 늦은 날부터 청년이 아닌 것으로 봄
 //   1) 실제 청년이 아니게 되는 날 = 만 35세 생일
-//   2) 근로계약체결일 + 4년(중소·중견) 또는 3년(대기업)
+//   2) 근로계약체결일 + 유지기간
+//      - 2025년: 중소·중견 3년 / 대기업 2년
+//      - 2026년~: 중소·중견 4년 / 대기업 3년
 //   제외시점 = max(만35세생일, 입사일+유지기간)
-function calcYouthExclude(birthDate, hireDate, corpType) {
+function calcYouthExclude(birthDate, hireDate, corpType, taxYear) {
   if (!birthDate || !hireDate) return null;
-  // 유지기간: 중소·중견 = 4년, 대기업 = 3년
-  const keepYears = (corpType === '대기업') ? 3 : 4;
+  // 유지기간: 2025년 한정 중소·중견 3년 / 대기업 2년, 그 외 중소·중견 4년 / 대기업 3년
+  const keepYears = (taxYear === 2025)
+    ? ((corpType === '대기업') ? 2 : 3)
+    : ((corpType === '대기업') ? 3 : 4);
   const hireExclude = new Date(hireDate.getFullYear() + keepYears, hireDate.getMonth(), hireDate.getDate());
   // 만 35세 생일 (청년이 아니게 되는 날)
   const age35Date = new Date(birthDate.getFullYear() + 35, birthDate.getMonth(), birthDate.getDate());
@@ -936,15 +943,15 @@ function processEmployees(employees, taxYear, corpType) {
       elderlyAtHire = hireDate ? isElderlyAtHire(birthDate, hireDate) : false;
 
 
-      // 2024년 이전 근로계약 체결자: 근로계약체결일 기준 청년여부 미적용
+      // 2025년 이전 근로계약 체결자: 근로계약체결일 기준 청년여부 미적용
       // → 과세연도 말일(12.31) 기준 나이로 청년 판정, 유지기간(제외시점) 없음
-      const isPreAmendContract = hireDate && hireDate < new Date(2024, 0, 1);
+      const isPreAmendContract = hireDate && hireDate < new Date(2025, 0, 1);
       if (isPreAmendContract) {
         isYouthHire = isYouthYear;
       } else {
         isYouthHire = hireDate ? isYouthAtHire(birthDate, hireDate) : false;
         if (isYouthHire) {
-          youthExclude = calcYouthExclude(birthDate, hireDate, corpType);
+          youthExclude = calcYouthExclude(birthDate, hireDate, corpType, taxYear);
         }
       }
     }
@@ -1238,6 +1245,18 @@ function calculate() {
   curProcessed  = applyYnEdits(curProcessed, 'cur', taxYear);
   prevProcessed = applyYnEdits(prevProcessed, 'prev', prevYear);
 
+  // 제외사유 드롭다운 편집 반영
+  curProcessed = curProcessed.map(emp => {
+    const rKey = 'cur:' + emp.code;
+    if (reasonEdits[rKey] !== undefined) return { ...emp, reason: reasonEdits[rKey] };
+    return emp;
+  });
+  prevProcessed = prevProcessed.map(emp => {
+    const rKey = 'prev:' + emp.code;
+    if (reasonEdits[rKey] !== undefined) return { ...emp, reason: reasonEdits[rKey] };
+    return emp;
+  });
+
   const curAgg  = calcAgg(curProcessed);
   const prevAgg = calcAgg(prevProcessed);
 
@@ -1310,6 +1329,16 @@ function changeShortTimeType(setKey, empCode, value) {
     delete shortTimeEdits[key];
   } else {
     shortTimeEdits[key] = value;
+  }
+  calculate();
+}
+
+function changeReason(setKey, empCode, value) {
+  const key = setKey + ':' + empCode;
+  if (value === '') {
+    delete reasonEdits[key];
+  } else {
+    reasonEdits[key] = value;
   }
   calculate();
 }
@@ -1412,6 +1441,19 @@ function renderDetailTable(processed, setKey) {
     return `<td class="yn-toggle ${cls}" id="${id}" title="클릭하여 Y↔N 전환" onclick="toggleYN('${setKey}','${empCode}','${field}')">${v}</td>`;
   };
 
+  // 상시근로자 제외사유 드롭다운 생성 헬퍼
+  const reasonSelect = (empCode, autoReason) => {
+    const key = setKey + ':' + empCode;
+    const cur = reasonEdits[key] !== undefined ? reasonEdits[key] : (autoReason || '');
+    return `<td class="reason"><select style="font-size:11px;padding:1px 2px;border:1px solid #ccc;border-radius:3px;background:#fff;cursor:pointer;"
+      onchange="changeReason('${setKey}','${empCode}',this.value)">
+      <option value=""${cur === '' ? ' selected' : ''}></option>
+      <option value="임원"${cur === '임원' ? ' selected' : ''}>임원</option>
+      <option value="친족"${cur === '친족' ? ' selected' : ''}>친족</option>
+      <option value="기타"${cur === '기타' ? ' selected' : ''}>기타</option>
+    </select></td>`;
+  };
+
   // 단시간근로자유형 셀렉트 박스 생성 헬퍼
   const shortTimeSelect = (empCode) => {
     const key = setKey + ':' + empCode;
@@ -1482,7 +1524,7 @@ function renderDetailTable(processed, setKey) {
       <td class="months">${emp.birthStr || ''}</td>
       <td class="name-col">${emp.name}${isOverride ? ' <span style="font-size:9px;opacity:.6">(수동)</span>' : ''}</td>
       ${ynCell(emp.regular, ec, 'regular')}
-      <td class="reason">${emp.reason || ''}</td>
+      ${reasonSelect(ec, emp.reason)}
       <td>${shortTimeSelect(ec)}</td>
       ${ynCell(emp.domestic, ec, 'domestic')}
       ${ynCell(emp.metro, ec, 'metro')}
@@ -1761,6 +1803,17 @@ async function downloadExcel() {
         promptTitle: '선택',
         prompt: 'Y 또는 N을 선택하세요'
       };
+      var reasonValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['"임원,친족,기타"'],
+        showErrorMessage: true,
+        errorTitle: '입력 오류',
+        error: '임원, 친족, 기타 중 선택하세요.',
+        showInputMessage: true,
+        promptTitle: '제외사유',
+        prompt: '임원, 친족, 기타 중 선택하세요'
+      };
       var shortTimeValidation = {
         type: 'list',
         allowBlank: true,
@@ -1801,6 +1854,10 @@ async function downloadExcel() {
           if (ynCols.indexOf(c) >= 0) {
             ws.getCell(r, c).dataValidation = ynValidation;
           }
+          // 제외사유 컬럼에 드롭다운 추가
+          if (c === 4) {
+            ws.getCell(r, c).dataValidation = reasonValidation;
+          }
           // 단시간근로자유형 컬럼에 드롭다운 추가
           if (c === 5) {
             ws.getCell(r, c).dataValidation = shortTimeValidation;
@@ -1838,15 +1895,16 @@ async function downloadExcel() {
 
         // Col N (14): ㉗청년제외시점 — 수식
         // = M열이 "Y"이고 A열·H열이 비어있지 않으면:
-        //   유지기간 = $N$3(기업유형)이 "대기업"이면 3, 아니면 4
+        //   유지기간: 2025년 → 대기업 2년 / 그 외 3년, 2026년~ → 대기업 3년 / 그 외 4년
         //   만35세생일 = (생년월일 왼쪽4자리+35) & 생년월일 오른쪽4자리
         //   입사+유지  = (근로계약체결일 왼쪽4자리+유지기간) & 근로계약체결일 오른쪽4자리
         //   제외시점   = MAX(만35세생일, 입사+유지)
+        var keepFormula = 'IF('+taxYearForFormula+'=2025,IF($N$3="대기업",2,3),IF($N$3="대기업",3,4))';
         var youthExclFormula =
           'IF(OR(M'+r+'<>"Y",A'+r+'="",H'+r+'=""),"",' +
             'TEXT(MAX(' +
               '(LEFT(A'+r+',4)+35)*10000+VALUE(RIGHT(A'+r+',4)),' +
-              '(LEFT(H'+r+',4)+IF($N$3="대기업",3,4))*10000+VALUE(RIGHT(H'+r+',4))' +
+              '(LEFT(H'+r+',4)+'+keepFormula+')*10000+VALUE(RIGHT(H'+r+',4))' +
             '),"00000000"))';
         FC(r, 14, youthExclFormula);
         var cellN = ws.getCell(r, 14);
@@ -1866,6 +1924,10 @@ async function downloadExcel() {
           // Y/N 컬럼에 드롭다운
           if (ynCols.indexOf(c) >= 0) {
             cell.dataValidation = ynValidation;
+          }
+          // 제외사유 컬럼에 드롭다운
+          if (c === 4) {
+            cell.dataValidation = reasonValidation;
           }
           // 단시간근로자유형 컬럼에 드롭다운
           if (c === 5) {
@@ -1895,11 +1957,12 @@ async function downloadExcel() {
           totalF+'-K'+r,
           '0');
         // Col N (14): ㉗청년제외시점 — 수식 (빈 행)
+        var keepFormula2 = 'IF('+taxYearForFormula+'=2025,IF($N$3="대기업",2,3),IF($N$3="대기업",3,4))';
         var youthExclFormula =
           'IF(OR(M'+r+'<>"Y",A'+r+'="",H'+r+'=""),"",' +
             'TEXT(MAX(' +
               '(LEFT(A'+r+',4)+35)*10000+VALUE(RIGHT(A'+r+',4)),' +
-              '(LEFT(H'+r+',4)+IF($N$3="대기업",3,4))*10000+VALUE(RIGHT(H'+r+',4))' +
+              '(LEFT(H'+r+',4)+'+keepFormula2+')*10000+VALUE(RIGHT(H'+r+',4))' +
             '),"00000000"))';
         FC(r, 14, youthExclFormula);
       }
