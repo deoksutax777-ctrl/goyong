@@ -550,6 +550,9 @@ let ynEdits = {};
 // 단시간근로자유형 편집: { 'cur:사원코드': '0.5'|'0.75'|'' }
 let shortTimeEdits = {};
 
+// 제외사유 수동 편집: { 'cur:사원코드': 'ⓐ'|'ⓑ'|'ⓒ'|'ⓓ'|'ⓔ'|'ⓕ'|'' }
+let reasonEdits = {};
+
 // 수도권 부서·임원 직급 — 파일 업로드 시 자동 감지 후 덮어씀
 // 사용자가 체크박스를 바꾸면 그 상태가 유지됨
 let metroDepts = new Set();
@@ -1066,7 +1069,7 @@ function calculate() {
         regular: forced,
         youthMonths:   forced === 'Y' ? emp.potentialYouthMonths   : 0,
         regularMonths: forced === 'Y' ? (emp.potentialRegularMonths - emp.potentialYouthMonths) : 0,
-        reason: forced === 'N' ? (emp.reason || '수동제외') : '',
+        reason: forced === 'N' ? (reasonEdits['cur:' + emp.code] || emp.reason || '수동제외') : '',
         _override: forced,
         _autoRegular: emp.regular,
       };
@@ -1082,7 +1085,7 @@ function calculate() {
         regular: forced,
         youthMonths:   forced === 'Y' ? emp.potentialYouthMonths   : 0,
         regularMonths: forced === 'Y' ? (emp.potentialRegularMonths - emp.potentialYouthMonths) : 0,
-        reason: forced === 'N' ? (emp.reason || '수동제외') : '',
+        reason: forced === 'N' ? (reasonEdits['prev:' + emp.code] || emp.reason || '수동제외') : '',
         _override: forced,
         _autoRegular: emp.regular,
       };
@@ -1265,6 +1268,19 @@ function changeShortTimeType(setKey, empCode, value) {
   calculate();
 }
 
+// 제외사유 변경 (드롭다운에서 호출) — 사유 선택 시 자동 제외, 빈값이면 자동 판정 복원
+function changeReason(setKey, empCode, value) {
+  const key = setKey + ':' + empCode;
+  if (value === '') {
+    delete reasonEdits[key];
+    delete overrides[key];
+  } else {
+    reasonEdits[key] = value;
+    overrides[key] = 'N';
+  }
+  calculate();
+}
+
 function fmt(n, decimals=2) {
   if (isNaN(n)) return '-';
   return n.toFixed(decimals);
@@ -1363,6 +1379,22 @@ function renderDetailTable(processed, setKey) {
     return `<td class="yn-toggle ${cls}" id="${id}" title="클릭하여 Y↔N 전환" onclick="toggleYN('${setKey}','${empCode}','${field}')">${v}</td>`;
   };
 
+  // 제외사유 드롭다운 생성 헬퍼
+  const reasonSelect = (empCode, autoReason) => {
+    const key = setKey + ':' + empCode;
+    const cur = reasonEdits[key] || autoReason || '';
+    return `<td class="reason"><select style="font-size:11px;padding:1px 2px;border:1px solid #ccc;border-radius:3px;background:#fff;cursor:pointer;color:${cur ? 'var(--warn)' : 'inherit'};"
+      onchange="changeReason('${setKey}','${empCode}',this.value)">
+      <option value=""${cur === '' ? ' selected' : ''}></option>
+      <option value="ⓐ"${cur === 'ⓐ' ? ' selected' : ''}>ⓐ 근로계약1년미만</option>
+      <option value="ⓑ"${cur === 'ⓑ' ? ' selected' : ''}>ⓑ 단시간</option>
+      <option value="ⓒ"${cur === 'ⓒ' ? ' selected' : ''}>ⓒ 임원</option>
+      <option value="ⓓ"${cur === 'ⓓ' ? ' selected' : ''}>ⓓ 최대주주·친족</option>
+      <option value="ⓔ"${cur === 'ⓔ' ? ' selected' : ''}>ⓔ 원천징수미확인</option>
+      <option value="ⓕ"${cur === 'ⓕ' ? ' selected' : ''}>ⓕ 기타</option>
+    </select></td>`;
+  };
+
   // 단시간근로자유형 셀렉트 박스 생성 헬퍼
   const shortTimeSelect = (empCode) => {
     const key = setKey + ':' + empCode;
@@ -1433,7 +1465,7 @@ function renderDetailTable(processed, setKey) {
       <td class="months">${emp.birthStr || ''}</td>
       <td class="name-col">${emp.name}${isOverride ? ' <span style="font-size:9px;opacity:.6">(수동)</span>' : ''}</td>
       ${ynCell(emp.regular, ec, 'regular')}
-      <td class="reason">${emp.reason || ''}</td>
+      ${reasonSelect(ec, emp.reason)}
       <td>${shortTimeSelect(ec)}</td>
       ${ynCell(emp.domestic, ec, 'domestic')}
       ${ynCell(emp.metro, ec, 'metro')}
