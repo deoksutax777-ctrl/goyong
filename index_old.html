@@ -823,9 +823,9 @@ function formatDate(d) {
 // 제외 사유: ⓐ 근로계약기간 1년 미만, ⓑ 단시간, ⓒ 임원, ⓓ 최대주주, ⓔ 원천징수미확인, ⓕ 기타
 function isRegularWorker(emp, taxYear) {
   // 고용보험 미적용이면서 임원이면 제외
-  if (emp.employ_insur === '부') return { regular: false, reason: 'ⓒ' };
+  if (emp.employ_insur === '부') return { regular: false, reason: 'ⓒ 임원' };
   // 임원 직급
-  if (execPositions.has(emp.position)) return { regular: false, reason: 'ⓒ' };
+  if (execPositions.has(emp.position)) return { regular: false, reason: 'ⓒ 임원' };
   // 고문 류 (임원 체크에서 관리)
   return { regular: true, reason: '' };
 }
@@ -1386,12 +1386,12 @@ function renderDetailTable(processed, setKey) {
     return `<td class="reason"><select style="font-size:11px;padding:1px 2px;border:1px solid #ccc;border-radius:3px;background:#fff;cursor:pointer;color:${cur ? 'var(--warn)' : 'inherit'};"
       onchange="changeReason('${setKey}','${empCode}',this.value)">
       <option value=""${cur === '' ? ' selected' : ''}></option>
-      <option value="ⓐ"${cur === 'ⓐ' ? ' selected' : ''}>ⓐ 근로계약1년미만</option>
-      <option value="ⓑ"${cur === 'ⓑ' ? ' selected' : ''}>ⓑ 단시간</option>
-      <option value="ⓒ"${cur === 'ⓒ' ? ' selected' : ''}>ⓒ 임원</option>
-      <option value="ⓓ"${cur === 'ⓓ' ? ' selected' : ''}>ⓓ 최대주주·친족</option>
-      <option value="ⓔ"${cur === 'ⓔ' ? ' selected' : ''}>ⓔ 원천징수미확인</option>
-      <option value="ⓕ"${cur === 'ⓕ' ? ' selected' : ''}>ⓕ 기타</option>
+      <option value="ⓐ 근로계약1년미만"${cur === 'ⓐ 근로계약1년미만' ? ' selected' : ''}>ⓐ 근로계약1년미만</option>
+      <option value="ⓑ 단시간"${cur === 'ⓑ 단시간' ? ' selected' : ''}>ⓑ 단시간</option>
+      <option value="ⓒ 임원"${cur === 'ⓒ 임원' ? ' selected' : ''}>ⓒ 임원</option>
+      <option value="ⓓ 최대주주·친족"${cur === 'ⓓ 최대주주·친족' ? ' selected' : ''}>ⓓ 최대주주·친족</option>
+      <option value="ⓔ 원천징수미확인"${cur === 'ⓔ 원천징수미확인' ? ' selected' : ''}>ⓔ 원천징수미확인</option>
+      <option value="ⓕ 기타"${cur === 'ⓕ 기타' ? ' selected' : ''}>ⓕ 기타</option>
     </select></td>`;
   };
 
