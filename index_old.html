@@ -1732,7 +1732,7 @@ async function downloadExcel() {
       var yearStart = taxYearForFormula + '0101';
       var yearEnd   = taxYearForFormula + '1231';
       // Y/N 드롭다운 대상 컬럼 (1-based): C(3), F(6), G(7), L(12), M(13), O(15), P(16), Q(17), R(18), S(19), T(20)
-      var ynCols = [3,6,7,12,13,15,16,17,18,19,20];
+      var ynCols = [6,7,12,13,15,16,17,18,19,20];
       var ynValidation = {
         type: 'list',
         allowBlank: true,
@@ -1743,6 +1743,17 @@ async function downloadExcel() {
         showInputMessage: true,
         promptTitle: '선택',
         prompt: 'Y 또는 N을 선택하세요'
+      };
+      var reasonValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['"ⓐ 근로계약1년미만,ⓑ 단시간,ⓒ 임원,ⓓ 최대주주·친족,ⓔ 원천징수미확인,ⓕ 기타"'],
+        showErrorMessage: true,
+        errorTitle: '입력 오류',
+        error: 'ⓐ~ⓕ 중 선택하세요.',
+        showInputMessage: true,
+        promptTitle: '제외사유',
+        prompt: 'ⓐ근로계약1년미만 ⓑ단시간 ⓒ임원 ⓓ최대주주·친족 ⓔ원천징수미확인 ⓕ기타'
       };
       var shortTimeValidation = {
         type: 'list',
@@ -1773,6 +1784,7 @@ async function downloadExcel() {
         ];
         vals.forEach(function(v, ci) {
           var c = ci + 1;
+          if (c === 3) return;  // skip — C열은 수식으로 처리 (제외사유 연동)
           if (c === 10 || c === 11) return; // skip — will be formulas
           var color = null;
           if (v === 'Y') color = 'FF0E7C61';
@@ -1783,11 +1795,23 @@ async function downloadExcel() {
           if (ynCols.indexOf(c) >= 0) {
             ws.getCell(r, c).dataValidation = ynValidation;
           }
+          // 제외사유 컬럼에 드롭다운 추가
+          if (c === 4) {
+            ws.getCell(r, c).dataValidation = reasonValidation;
+          }
           // 단시간근로자유형 컬럼에 드롭다운 추가
           if (c === 5) {
             ws.getCell(r, c).dataValidation = shortTimeValidation;
           }
         });
+
+        // Col C (3): ⑯상시근로자 여부 — D열(제외사유)이 비어있으면 Y, 있으면 N
+        FC(r, 3, 'IF(D'+r+'="","Y","N")', null);
+        var cellC = ws.getCell(r, 3);
+        cellC.fill = {type:'pattern', pattern:'solid', fgColor:{argb:bg}};
+        cellC.alignment = {horizontal:'center', vertical:'middle'};
+        cellC.font = {name:'Noto Sans KR', size:9, bold:true,
+          color:{argb: emp.regular==='Y' ? 'FF0E7C61' : 'FFCCCCCC'}};
 
         // 전체 근무개월수 수식 (J+K 계산 기반) — K에서 인라인 사용
         var totalF = 'IF(C'+r+'="Y",FLOOR((VALUE(RIGHT(I'+r+',2))-VALUE(LEFT(I'+r+',2))+1)*IF(E'+r+'="",1,VALUE(E'+r+')),0.01),0)';
