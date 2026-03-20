@@ -1657,7 +1657,9 @@ function changeReason(setKey, empCode, value) {
 
 function fmt(n, decimals=2) {
   if (isNaN(n)) return '-';
-  return n.toFixed(decimals);
+  // 소수점 아래 버림 (세법: 0.01 미만 버림)
+  const factor = Math.pow(10, decimals);
+  return (Math.floor(n * factor) / factor).toFixed(decimals);
 }
 
 function renderAggTable(cur, prev, taxYear) {
@@ -1681,28 +1683,28 @@ function renderAggTable(cur, prev, taxYear) {
       <tbody>
         <tr>
           <td><strong>해당과세연도</strong></td>
-          <td>${cur.totalMonths}</td>
+          <td>${fmt(cur.totalMonths)}</td>
           <td>${cur.months12}</td>
           <td>${fmt(cur.workerCount)}</td>
-          <td>${cur.youthTotalMonths}</td>
-          <td>${cur.disabledMonths}</td>
-          <td>${cur.elderlyMonths}</td>
-          <td>${cur.careerMonths}</td><td>${cur.nkDefectorMonths}</td>
-          <td>${cur.youthTotalSum}</td>
+          <td>${fmt(cur.youthTotalMonths)}</td>
+          <td>${fmt(cur.disabledMonths)}</td>
+          <td>${fmt(cur.elderlyMonths)}</td>
+          <td>${fmt(cur.careerMonths)}</td><td>${fmt(cur.nkDefectorMonths)}</td>
+          <td>${fmt(cur.youthTotalSum)}</td>
           <td>${cur.months12}</td>
           <td>${fmt(cur.youthWorkerCount)}</td>
           <td>${fmt(cur.nonYouthWorkerCount)}</td>
         </tr>
         <tr>
           <td><strong>직전과세연도</strong></td>
-          <td>${prev.totalMonths}</td>
+          <td>${fmt(prev.totalMonths)}</td>
           <td>${prev.months12}</td>
           <td>${fmt(prev.workerCount)}</td>
-          <td>${prev.youthTotalMonths}</td>
-          <td>${prev.disabledMonths}</td>
-          <td>${prev.elderlyMonths}</td>
-          <td>${prev.careerMonths}</td><td>${prev.nkDefectorMonths}</td>
-          <td>${prev.youthTotalSum}</td>
+          <td>${fmt(prev.youthTotalMonths)}</td>
+          <td>${fmt(prev.disabledMonths)}</td>
+          <td>${fmt(prev.elderlyMonths)}</td>
+          <td>${fmt(prev.careerMonths)}</td><td>${fmt(prev.nkDefectorMonths)}</td>
+          <td>${fmt(prev.youthTotalSum)}</td>
           <td>${prev.months12}</td>
           <td>${fmt(prev.youthWorkerCount)}</td>
           <td>${fmt(prev.nonYouthWorkerCount)}</td>
@@ -1845,8 +1847,8 @@ function renderDetailTable(processed, setKey) {
       ${ynCell(emp.metro, ec, 'metro')}
       <td class="months">${emp.hireStr}${emp.resignStr ? `<br><span style="font-size:9px;color:#e74c3c;opacity:.7;">~${emp.resignStr}</span>` : ''}</td>
       <td>${emp.workPeriod}</td>
-      <td class="months">${emp.regularMonths % 1 === 0 ? (emp.regularMonths || 0) : emp.regularMonths}</td>
-      <td class="months">${emp.youthMonths % 1 === 0 ? (emp.youthMonths || 0) : emp.youthMonths}</td>
+      <td class="months">${emp.regularMonths % 1 === 0 ? (emp.regularMonths || 0) : fmt(emp.regularMonths)}</td>
+      <td class="months">${emp.youthMonths % 1 === 0 ? (emp.youthMonths || 0) : fmt(emp.youthMonths)}</td>
       ${ynCell(emp.isYouthYear, ec, 'isYouthYear')}
       ${ynCell(emp.isYouthHire, ec, 'isYouthHire')}
       <td class="months">${emp.youthExclude || ''}</td>
