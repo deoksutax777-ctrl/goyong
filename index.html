@@ -641,7 +641,7 @@ function downloadTemplate() {
   const ws = wb.addWorksheet('템플릿');
 
   // 헤더
-  const headers = ['생년월일', '성명', '상시근로자제외사유', '단시간근로자유형', '내국인', '수도권', '근로계약체결일', '퇴사년월일', '장애인'];
+  const headers = ['생년월일', '성명', '상시근로자', '상시근로자제외사유', '단시간근로자유형', '내국인', '수도권', '근로계약체결일', '퇴사년월일', '장애인'];
   const headerRow = ws.addRow(headers);
   headerRow.eachCell(cell => {
     cell.font = { name: '맑은 고딕', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
@@ -651,7 +651,7 @@ function downloadTemplate() {
   });
 
   // 예시 데이터 (2행)
-  const example = ['19910315', '홍길동', '', '', 'Y', 'Y', '20230301', '', 'N'];
+  const example = ['19910315', '홍길동', 'Y', '', '', 'Y', 'Y', '20230301', '', 'N'];
   const exRow = ws.addRow(example);
   exRow.eachCell(cell => {
     cell.font = { name: '맑은 고딕', size: 10, color: { argb: 'FF999999' } };
@@ -660,7 +660,7 @@ function downloadTemplate() {
   });
 
   // 안내 행
-  const guideRow = ws.addRow(['YYYYMMDD', '', '임원/친족/기타/빈칸', '0.5 또는 0.75', 'Y/N', 'Y/N', 'YYYYMMDD', 'YYYYMMDD(선택)', 'Y/N']);
+  const guideRow = ws.addRow(['YYYYMMDD', '', 'Y/N', '임원/친족/기타/빈칸', '0.5 또는 0.75', 'Y/N', 'Y/N', 'YYYYMMDD', 'YYYYMMDD(선택)', 'Y/N']);
   guideRow.eachCell(cell => {
     cell.font = { name: '맑은 고딕', size: 8, italic: true, color: { argb: 'FF888888' } };
     cell.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -668,17 +668,18 @@ function downloadTemplate() {
 
   // 컬럼 너비
   ws.columns = [
-    { width: 14 }, { width: 12 }, { width: 18 }, { width: 16 },
+    { width: 14 }, { width: 12 }, { width: 12 }, { width: 18 }, { width: 16 },
     { width: 8 }, { width: 8 }, { width: 14 }, { width: 14 }, { width: 8 }
   ];
 
   // 드롭다운 (4~50행)
   for (let r = 2; r <= 50; r++) {
-    ws.getCell(r, 3).dataValidation = { type: 'list', formulae: ['"임원,친족,기타"'], showDropDown: true };
-    ws.getCell(r, 4).dataValidation = { type: 'list', formulae: ['"0.5,0.75"'], showDropDown: true };
-    ws.getCell(r, 5).dataValidation = { type: 'list', formulae: ['"Y,N"'], showDropDown: true };
+    ws.getCell(r, 3).dataValidation = { type: 'list', formulae: ['"Y,N"'], showDropDown: true };
+    ws.getCell(r, 4).dataValidation = { type: 'list', formulae: ['"임원,친족,기타"'], showDropDown: true };
+    ws.getCell(r, 5).dataValidation = { type: 'list', formulae: ['"0.5,0.75"'], showDropDown: true };
     ws.getCell(r, 6).dataValidation = { type: 'list', formulae: ['"Y,N"'], showDropDown: true };
-    ws.getCell(r, 9).dataValidation = { type: 'list', formulae: ['"Y,N"'], showDropDown: true };
+    ws.getCell(r, 7).dataValidation = { type: 'list', formulae: ['"Y,N"'], showDropDown: true };
+    ws.getCell(r, 10).dataValidation = { type: 'list', formulae: ['"Y,N"'], showDropDown: true };
   }
 
   wb.xlsx.writeBuffer().then(buf => {
@@ -799,6 +800,7 @@ function parseEmployees(rows) {
     if (isTemplate) {
       const colBirth   = findCol(['생년월일']);
       const colName    = findCol(['성명', '사원명']);
+      const colRegular = findCol(['상시근로자여부', '상시근로자']);  // 상시근로자 Y/N (선택)
       const colReason  = findCol(['상시근로자제외사유', '제외사유']);
       const colShort   = findCol(['단시간근로자유형', '단시간']);
       const colDom     = findCol(['내국인']);
@@ -807,20 +809,70 @@ function parseEmployees(rows) {
       const colResign  = findCol(['퇴사년월일', '퇴사일']);
       const colDisab   = findCol(['장애인']);
 
+      // 헤더에 '상시근로자' 컬럼이 없지만, 데이터에 Y/N이 들어있는 경우 자동 감지
+      // (제외사유 컬럼에 'Y'/'N'만 있으면 → 상시근로자 컬럼으로 간주하고 한 칸씩 밀림)
+      let shiftDetected = false;
+      if (colRegular < 0 && colReason >= 0 && rows.length > 1) {
+        // 제외사유 컬럼의 데이터가 전부 Y/N/빈칸이면 → 실제로는 상시근로자 컬럼
+        const sampleVals = [];
+        for (let si = 1; si < Math.min(rows.length, 10); si++) {
+          if (rows[si] && rows[si][colReason] !== undefined) {
+            sampleVals.push(String(rows[si][colReason]).trim().toUpperCase());
+          }
+        }
+        const allYN = sampleVals.length > 0 && sampleVals.every(v => v === 'Y' || v === 'N' || v === '');
+        if (allYN) {
+          shiftDetected = true;
+        }
+      }
+
       for (let i = 1; i < rows.length; i++) {
         const r = rows[i];
         if (!r || r.length < 2) continue;
         const name = colName >= 0 ? String(r[colName]).trim() : '';
         if (!name || name === 'undefined') continue;
 
+        let regularYN, reason, shortT, dom, metro, hireStr, resignStr, disab;
+
+        if (colRegular >= 0) {
+          // 상시근로자 헤더가 명시적으로 있는 경우 → 헤더 기반 파싱
+          regularYN = String(r[colRegular]).trim().toUpperCase();
+          reason    = colReason >= 0 ? String(r[colReason]).trim() : '';
+          shortT    = colShort >= 0 ? String(r[colShort]).trim() : '';
+          dom       = colDom >= 0 ? String(r[colDom]).trim().toUpperCase() : 'Y';
+          metro     = colMetro >= 0 ? String(r[colMetro]).trim().toUpperCase() : 'N';
+          hireStr   = colHire >= 0 ? String(r[colHire]).replace(/\D/g,'') : '';
+          resignStr = colResign >= 0 ? String(r[colResign]).replace(/\D/g,'') : '';
+          disab     = colDisab >= 0 ? String(r[colDisab]).trim().toUpperCase() : 'N';
+        } else if (shiftDetected) {
+          // 상시근로자 헤더 없이 데이터가 한 칸 밀린 경우 → 위치 기반 파싱
+          // 실제 배치: [생년월일, 성명, 상시근로자(Y/N), 제외사유, 단시간, 내국인, 수도권, 근로계약체결일, 장애인]
+          const sc = colReason; // 제외사유 헤더 위치 = 실제 상시근로자 위치
+          regularYN = String(r[sc] || '').trim().toUpperCase();
+          reason    = String(r[sc + 1] || '').trim();
+          shortT    = String(r[sc + 2] || '').trim();
+          dom       = String(r[sc + 3] || '').trim().toUpperCase() || 'Y';
+          metro     = String(r[sc + 4] || '').trim().toUpperCase() || 'N';
+          hireStr   = String(r[sc + 5] || '').replace(/\D/g,'');
+          resignStr = '';  // 밀림 시 퇴사년월일 없음
+          disab     = String(r[sc + 6] || '').trim().toUpperCase() || 'N';
+        } else {
+          // 기본: 헤더 기반 파싱 (상시근로자 컬럼 없음)
+          regularYN = '';
+          reason    = colReason >= 0 ? String(r[colReason]).trim() : '';
+          shortT    = colShort >= 0 ? String(r[colShort]).trim() : '';
+          dom       = colDom >= 0 ? String(r[colDom]).trim().toUpperCase() : 'Y';
+          metro     = colMetro >= 0 ? String(r[colMetro]).trim().toUpperCase() : 'N';
+          hireStr   = colHire >= 0 ? String(r[colHire]).replace(/\D/g,'') : '';
+          resignStr = colResign >= 0 ? String(r[colResign]).replace(/\D/g,'') : '';
+          disab     = colDisab >= 0 ? String(r[colDisab]).trim().toUpperCase() : 'N';
+        }
+
         const birthStr = colBirth >= 0 ? String(r[colBirth]).replace(/\D/g,'') : '';
-        const reason   = colReason >= 0 ? String(r[colReason]).trim() : '';
-        const shortT   = colShort >= 0 ? String(r[colShort]).trim() : '';
-        const dom      = colDom >= 0 ? String(r[colDom]).trim().toUpperCase() : 'Y';
-        const metro    = colMetro >= 0 ? String(r[colMetro]).trim().toUpperCase() : 'N';
-        const hireStr  = colHire >= 0 ? String(r[colHire]).replace(/\D/g,'') : '';
-        const resignStr= colResign >= 0 ? String(r[colResign]).replace(/\D/g,'') : '';
-        const disab    = colDisab >= 0 ? String(r[colDisab]).trim().toUpperCase() : 'N';
+
+        // 상시근로자 판정: regularYN이 명시적 'N'이면 비상시, reason이 있으면 비상시
+        let templateReason = reason;
+        if (regularYN === 'N' && !reason) templateReason = '기타';  // N인데 제외사유 없으면 기타로 설정
 
         employees.push({
           code: String(i),
@@ -836,7 +888,7 @@ function parseEmployees(rows) {
           age60plus: 0,
           _isTemplate: true,
           _birthDateStr: birthStr,
-          _templateReason: reason,
+          _templateReason: templateReason,
           _templateShortTime: (shortT === '0.5' || shortT === '0.75') ? shortT : '',
           _templateDomestic: dom === 'Y' ? 'Y' : 'N',
           _templateMetro: metro === 'Y' ? 'Y' : 'N',
