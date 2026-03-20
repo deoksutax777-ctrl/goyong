@@ -385,7 +385,10 @@
 
   <!-- ── 파일 업로드 ──────────────── -->
   <div class="panel upload-section no-print">
-    <div class="panel-header"><span class="icon">📂</span> 사원등록 파일 업로드</div>
+    <div class="panel-header" style="display:flex;align-items:center;justify-content:space-between;">
+      <span><span class="icon">📂</span> 파일 업로드 (사원등록 또는 템플릿)</span>
+      <button onclick="downloadTemplate()" style="font-size:11px;padding:4px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text-muted);">템플릿 다운로드</button>
+    </div>
     <div class="panel-body">
       <div class="upload-grid">
         <div class="upload-card" id="drop-cur"
@@ -395,8 +398,8 @@
           ondrop="handleDrop(event,'cur')">
           <input type="file" id="file-cur" accept=".xlsx,.xls" onchange="handleFile(this,'cur')">
           <div class="upload-icon">📊</div>
-          <div class="upload-label">당기 사원등록</div>
-          <div class="upload-sub">해당 과세연도 (.xlsx)<br><span style="font-size:10px;margin-top:3px;display:block;opacity:.7;">파일을 여기에 드래그하거나 클릭하세요</span></div>
+          <div class="upload-label">당기</div>
+          <div class="upload-sub">사원등록 또는 템플릿 (.xlsx)<br><span style="font-size:10px;margin-top:3px;display:block;opacity:.7;">파일을 여기에 드래그하거나 클릭하세요</span></div>
           <div id="filename-cur" class="upload-filename" style="display:none"></div>
         </div>
         <div class="upload-card" id="drop-prev"
@@ -406,8 +409,8 @@
           ondrop="handleDrop(event,'prev')">
           <input type="file" id="file-prev" accept=".xlsx,.xls" onchange="handleFile(this,'prev')">
           <div class="upload-icon">📊</div>
-          <div class="upload-label">전기 사원등록</div>
-          <div class="upload-sub">직전 과세연도 (.xlsx)<br><span style="font-size:10px;margin-top:3px;display:block;opacity:.7;">파일을 여기에 드래그하거나 클릭하세요</span></div>
+          <div class="upload-label">전기</div>
+          <div class="upload-sub">사원등록 또는 템플릿 (.xlsx)<br><span style="font-size:10px;margin-top:3px;display:block;opacity:.7;">파일을 여기에 드래그하거나 클릭하세요</span></div>
           <div id="filename-prev" class="upload-filename" style="display:none"></div>
         </div>
       </div>
@@ -611,22 +614,76 @@ function readExcel(file, key, fname) {
     el.style.display = 'inline-block';
     document.getElementById('drop-' + key).classList.add('has-file');
 
-    // Collect depts & positions — 새로 발견된 항목만 추가하고 기본값 자동 세팅
-    parsed.forEach(e => {
-      if (e.dept && !allDepts.has(e.dept)) {
-        allDepts.add(e.dept);
-        if (guessMetro(e.dept)) metroDepts.add(e.dept);
-      }
-      if (e.position && !allPositions.has(e.position)) {
-        allPositions.add(e.position);
-        if (guessExec(e.position)) execPositions.add(e.position);
-      }
-    });
+    // Collect depts & positions — 템플릿이 아닌 경우만 (템플릿은 부서/직급 없음)
+    const isTemplateData = parsed.length > 0 && parsed[0]._isTemplate;
+    if (!isTemplateData) {
+      parsed.forEach(e => {
+        if (e.dept && !allDepts.has(e.dept)) {
+          allDepts.add(e.dept);
+          if (guessMetro(e.dept)) metroDepts.add(e.dept);
+        }
+        if (e.position && !allPositions.has(e.position)) {
+          allPositions.add(e.position);
+          if (guessExec(e.position)) execPositions.add(e.position);
+        }
+      });
+    }
     renderCheckboxes();
 
     if (empData.cur || empData.prev) calculate();
   };
   reader.readAsBinaryString(file);
+}
+
+// ── 템플릿 엑셀 다운로드 ──
+function downloadTemplate() {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('템플릿');
+
+  // 헤더
+  const headers = ['생년월일', '성명', '상시근로자제외사유', '단시간근로자유형', '내국인', '수도권', '근로계약체결일', '퇴사년월일', '장애인'];
+  const headerRow = ws.addRow(headers);
+  headerRow.eachCell(cell => {
+    cell.font = { name: '맑은 고딕', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2C3E50' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.border = { top:{style:'thin'}, bottom:{style:'thin'}, left:{style:'thin'}, right:{style:'thin'} };
+  });
+
+  // 예시 데이터 (2행)
+  const example = ['19910315', '홍길동', '', '', 'Y', 'Y', '20230301', '', 'N'];
+  const exRow = ws.addRow(example);
+  exRow.eachCell(cell => {
+    cell.font = { name: '맑은 고딕', size: 10, color: { argb: 'FF999999' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.border = { top:{style:'thin'}, bottom:{style:'thin'}, left:{style:'thin'}, right:{style:'thin'} };
+  });
+
+  // 안내 행
+  const guideRow = ws.addRow(['YYYYMMDD', '', '임원/친족/기타/빈칸', '0.5 또는 0.75', 'Y/N', 'Y/N', 'YYYYMMDD', 'YYYYMMDD(선택)', 'Y/N']);
+  guideRow.eachCell(cell => {
+    cell.font = { name: '맑은 고딕', size: 8, italic: true, color: { argb: 'FF888888' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+  });
+
+  // 컬럼 너비
+  ws.columns = [
+    { width: 14 }, { width: 12 }, { width: 18 }, { width: 16 },
+    { width: 8 }, { width: 8 }, { width: 14 }, { width: 14 }, { width: 8 }
+  ];
+
+  // 드롭다운 (4~50행)
+  for (let r = 2; r <= 50; r++) {
+    ws.getCell(r, 3).dataValidation = { type: 'list', formulae: ['"임원,친족,기타"'], showDropDown: true };
+    ws.getCell(r, 4).dataValidation = { type: 'list', formulae: ['"0.5,0.75"'], showDropDown: true };
+    ws.getCell(r, 5).dataValidation = { type: 'list', formulae: ['"Y,N"'], showDropDown: true };
+    ws.getCell(r, 6).dataValidation = { type: 'list', formulae: ['"Y,N"'], showDropDown: true };
+    ws.getCell(r, 9).dataValidation = { type: 'list', formulae: ['"Y,N"'], showDropDown: true };
+  }
+
+  wb.xlsx.writeBuffer().then(buf => {
+    saveAs(new Blob([buf], { type: 'application/octet-stream' }), '고용증대_템플릿.xlsx');
+  });
 }
 
 function parseEmployees(rows) {
@@ -732,6 +789,62 @@ function parseEmployees(rows) {
 
     employees.push(emp);
   }
+
+  // ── 포맷C: 템플릿 형식 (생년월일·성명·내국인·수도권·근로계약체결일 등 직접 입력) ──
+  // 사원등록 포맷에서 파싱 실패했거나, 생년월일+내국인 헤더가 있으면 템플릿으로 재시도
+  if (employees.length === 0) {
+    const isTemplate = headerStr.some(h => h.includes('생년월일')) &&
+                       (headerStr.some(h => h.includes('성명')) || headerStr.some(h => h.includes('사원명'))) &&
+                       headerStr.some(h => h.includes('내국인'));
+    if (isTemplate) {
+      const colBirth   = findCol(['생년월일']);
+      const colName    = findCol(['성명', '사원명']);
+      const colReason  = findCol(['상시근로자제외사유', '제외사유']);
+      const colShort   = findCol(['단시간근로자유형', '단시간']);
+      const colDom     = findCol(['내국인']);
+      const colMetro   = findCol(['수도권']);
+      const colHire    = findCol(['근로계약체결일', '계약체결일']);
+      const colResign  = findCol(['퇴사년월일', '퇴사일']);
+      const colDisab   = findCol(['장애인']);
+
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        if (!r || r.length < 2) continue;
+        const name = colName >= 0 ? String(r[colName]).trim() : '';
+        if (!name || name === 'undefined') continue;
+
+        const birthStr = colBirth >= 0 ? String(r[colBirth]).replace(/\D/g,'') : '';
+        const reason   = colReason >= 0 ? String(r[colReason]).trim() : '';
+        const shortT   = colShort >= 0 ? String(r[colShort]).trim() : '';
+        const dom      = colDom >= 0 ? String(r[colDom]).trim().toUpperCase() : 'Y';
+        const metro    = colMetro >= 0 ? String(r[colMetro]).trim().toUpperCase() : 'N';
+        const hireStr  = colHire >= 0 ? String(r[colHire]).replace(/\D/g,'') : '';
+        const resignStr= colResign >= 0 ? String(r[colResign]).replace(/\D/g,'') : '';
+        const disab    = colDisab >= 0 ? String(r[colDisab]).trim().toUpperCase() : 'N';
+
+        employees.push({
+          code: String(i),
+          name,
+          ssn: '',
+          foreigner: dom === 'Y' ? '내국인' : '외국인',
+          hire_date: hireStr,
+          resign_date: resignStr,
+          dept: '',
+          position: '',
+          employ_insur: '여',
+          disabled: disab === 'Y' ? 1 : 0,
+          age60plus: 0,
+          _isTemplate: true,
+          _birthDateStr: birthStr,
+          _templateReason: reason,
+          _templateShortTime: (shortT === '0.5' || shortT === '0.75') ? shortT : '',
+          _templateDomestic: dom === 'Y' ? 'Y' : 'N',
+          _templateMetro: metro === 'Y' ? 'Y' : 'N',
+        });
+      }
+    }
+  }
+
   return employees;
 }
 
@@ -914,18 +1027,25 @@ function isElderlyAtHire(birthDate, hireDate) {
 
 function processEmployees(employees, taxYear, corpType) {
   return employees.map(emp => {
-    const birthDate = getBirthDate(emp.ssn);
+    // 템플릿: _birthDateStr에서 직접 파싱, 사원등록: SSN에서 추출
+    const birthDate = emp._birthDateStr ? parseDateStr(emp._birthDateStr) : getBirthDate(emp.ssn);
     const hireDate = parseDateStr(emp.hire_date);
     const resignDate = emp.resign_date ? parseDateStr(emp.resign_date) : null;
 
-    // 상시근로자 여부
-    const { regular, reason } = isRegularWorker(emp, taxYear);
+    // 상시근로자 여부: 템플릿은 제외사유로 직접 판단
+    let regular, reason;
+    if (emp._isTemplate) {
+      reason = emp._templateReason || '';
+      regular = !reason;
+    } else {
+      ({ regular, reason } = isRegularWorker(emp, taxYear));
+    }
 
-    // 수도권
-    const metro = metroDepts.has(emp.dept) ? 'Y' : 'N';
+    // 수도권: 템플릿은 직접 입력값 사용
+    const metro = emp._isTemplate ? (emp._templateMetro || 'N') : (metroDepts.has(emp.dept) ? 'Y' : 'N');
 
-    // 내국인
-    const domestic = (emp.foreigner === '내국인') ? 'Y' : 'N';
+    // 내국인: 템플릿은 직접 입력값 사용
+    const domestic = emp._isTemplate ? (emp._templateDomestic || 'Y') : ((emp.foreigner === '내국인') ? 'Y' : 'N');
 
     // 근로기간 계산
     const { months, startM, endM } = calcWorkMonths(emp, taxYear);
@@ -1033,11 +1153,13 @@ function processEmployees(employees, taxYear, corpType) {
       metro,
       domestic,
       hireStr: emp.hire_date ? emp.hire_date.substring(0,8) : '',
+      resignStr: emp.resign_date ? String(emp.resign_date).replace(/\D/g,'').substring(0,8) : '',
       workPeriod,
       regularMonths,
       youthMonths,
       potentialRegularMonths,
       potentialYouthMonths,
+      shortTimeType: emp._templateShortTime || '',
       isYouthYear: isYouthYear ? 'Y' : 'N',
       isYouthHire: isYouthHire ? 'Y' : 'N',
       youthExclude: (isYouthHire && youthExclude) ? youthExclude : '',
@@ -1064,9 +1186,10 @@ function calcAgg(processed) {
   // 총 근무개월수 합계 (regularMonths=청년외 + youthMonths=청년등)
   const totalMonths = processed.reduce((s,e) => s + (e.regularMonths + e.youthMonths), 0);
 
-  // ⑤ 청년 개월수: 상시근로자(Y) AND 청년(Y) AND 장애인등 특수 아닌 경우의 K열 합
+  // ⑤ 청년 개월수: 상시근로자(Y) AND 청년등 개월수>0 AND 장애인등 특수 아닌 경우의 K열 합
+  // 2025년 이전 계약자(과세연도 기준 청년)도 포함되도록 youthMonths > 0 으로 판정
   const youthTotalMonths = processed
-    .filter(e => e.regular === 'Y' && e.isYouthHire === 'Y' &&
+    .filter(e => e.regular === 'Y' && e.youthMonths > 0 &&
       e.isDisabled !== 'Y' && !e.elderlyAtHire &&
       (e._career||'N') !== 'Y' && (e._nkDefector||'N') !== 'Y' &&
       (e._regularConvert||'N') !== 'Y' && (e._childcareReturn||'N') !== 'Y')
@@ -1201,7 +1324,7 @@ function calculate() {
           copy.youthMonths = 0;
           // 단시간근로자유형 적용 (제외자도 shortTimeType 저장)
           const stKey = setKey + ':' + emp.code;
-          copy.shortTimeType = shortTimeEdits[stKey] || '';
+          copy.shortTimeType = shortTimeEdits.hasOwnProperty(stKey) ? shortTimeEdits[stKey] : (copy.shortTimeType || '');
           return copy;
         }
 
@@ -1247,8 +1370,9 @@ function calculate() {
       }
 
       // 단시간근로자유형 적용: 0.5 또는 0.75 선택 시 근무개월수에 곱하기
+      // 수동 편집 > 템플릿 기본값 > 빈 문자열 순서로 우선 적용
       const stKey = setKey + ':' + emp.code;
-      const stType = shortTimeEdits[stKey] || '';
+      const stType = shortTimeEdits.hasOwnProperty(stKey) ? shortTimeEdits[stKey] : (copy.shortTimeType || '');
       copy.shortTimeType = stType;
       if (stType) {
         const multiplier = parseFloat(stType);
@@ -1553,7 +1677,7 @@ function renderDetailTable(processed, setKey) {
       <td>${shortTimeSelect(ec)}</td>
       ${ynCell(emp.domestic, ec, 'domestic')}
       ${ynCell(emp.metro, ec, 'metro')}
-      <td class="months">${emp.hireStr}</td>
+      <td class="months">${emp.hireStr}${emp.resignStr ? `<br><span style="font-size:9px;color:#e74c3c;opacity:.7;">~${emp.resignStr}</span>` : ''}</td>
       <td>${emp.workPeriod}</td>
       <td class="months">${emp.regularMonths % 1 === 0 ? (emp.regularMonths || 0) : emp.regularMonths}</td>
       <td class="months">${emp.youthMonths % 1 === 0 ? (emp.youthMonths || 0) : emp.youthMonths}</td>
@@ -1580,7 +1704,7 @@ function renderDetailTable(processed, setKey) {
         <th rowspan="2">⑱단시간\n근로자유형\n(0.5/0.75)</th>
         <th rowspan="2">⑲내국인\n(N/Y)</th>
         <th rowspan="2">⑳수도권\n근무지\n(N/Y)</th>
-        <th rowspan="2">㉑근로계약\n체결일\n(YYYYMMDD)</th>
+        <th rowspan="2">㉑근로계약\n체결일·퇴사일\n(YYYYMMDD)</th>
         <th rowspan="2">㉒근로기간\n(MM-MM)</th>
         <th rowspan="2">㉓상시근로자\n근무개월수</th>
         <th rowspan="2">㉔청년등\n근무개월수</th>
@@ -1760,8 +1884,8 @@ async function downloadExcel() {
     FC(9,3,  'SUM(J'+CS+':J'+CE+')+SUM(K'+CS+':K'+CE+')', '0');
     FC(9,5,  'SUMPRODUCT(TRUNC((J'+CS+':J'+CE+'+K'+CS+':K'+CE+')/12,2))', '0.00');
     SC(9,4,  12);
-    // ⑤청년 개월수
-    FC(9,6, 'SUMPRODUCT((C'+CS+':C'+CE+'="Y")*(M'+CS+':M'+CE+'="Y")*(O'+CS+':O'+CE+'<>"Y")*(P'+CS+':P'+CE+'<>"Y")*(Q'+CS+':Q'+CE+'<>"Y")*(R'+CS+':R'+CE+'<>"Y")*(S'+CS+':S'+CE+'<>"Y")*(T'+CS+':T'+CE+'<>"Y")*K'+CS+':K'+CE+')', '0');
+    // ⑤청년 개월수 (K열이 이미 과세연도/계약체결일 기준 청년 반영하므로 M열 조건 불필요)
+    FC(9,6, 'SUMPRODUCT((C'+CS+':C'+CE+'="Y")*(O'+CS+':O'+CE+'<>"Y")*(P'+CS+':P'+CE+'<>"Y")*(Q'+CS+':Q'+CE+'<>"Y")*(R'+CS+':R'+CE+'<>"Y")*(S'+CS+':S'+CE+'<>"Y")*(T'+CS+':T'+CE+'<>"Y")*K'+CS+':K'+CE+')', '0');
     // ⑥장애인 개월수
     FC(9,7, 'SUMPRODUCT((C'+CS+':C'+CE+'="Y")*(O'+CS+':O'+CE+'="Y")*(J'+CS+':J'+CE+'+K'+CS+':K'+CE+'))', '0');
     // ⑦고령자 개월수
@@ -1781,7 +1905,7 @@ async function downloadExcel() {
     FC(10,3,  'SUM(J'+PS+':J'+PE+')+SUM(K'+PS+':K'+PE+')', '0');
     FC(10,5,  'SUMPRODUCT(TRUNC((J'+PS+':J'+PE+'+K'+PS+':K'+PE+')/12,2))', '0.00');
     SC(10,4,  12);
-    FC(10,6, 'SUMPRODUCT((C'+PS+':C'+PE+'="Y")*(M'+PS+':M'+PE+'="Y")*(O'+PS+':O'+PE+'<>"Y")*(P'+PS+':P'+PE+'<>"Y")*(Q'+PS+':Q'+PE+'<>"Y")*(R'+PS+':R'+PE+'<>"Y")*(S'+PS+':S'+PE+'<>"Y")*(T'+PS+':T'+PE+'<>"Y")*K'+PS+':K'+PE+')', '0');
+    FC(10,6, 'SUMPRODUCT((C'+PS+':C'+PE+'="Y")*(O'+PS+':O'+PE+'<>"Y")*(P'+PS+':P'+PE+'<>"Y")*(Q'+PS+':Q'+PE+'<>"Y")*(R'+PS+':R'+PE+'<>"Y")*(S'+PS+':S'+PE+'<>"Y")*(T'+PS+':T'+PE+'<>"Y")*K'+PS+':K'+PE+')', '0');
     FC(10,7, 'SUMPRODUCT((C'+PS+':C'+PE+'="Y")*(O'+PS+':O'+PE+'="Y")*(J'+PS+':J'+PE+'+K'+PS+':K'+PE+'))', '0');
     FC(10,8, 'SUMPRODUCT((C'+PS+':C'+PE+'="Y")*(P'+PS+':P'+PE+'="Y")*(J'+PS+':J'+PE+'+K'+PS+':K'+PE+'))', '0');
     FC(10,9, 'SUMPRODUCT((C'+PS+':C'+PE+'="Y")*(Q'+PS+':Q'+PE+'="Y")*(J'+PS+':J'+PE+'+K'+PS+':K'+PE+'))', '0');
@@ -1902,14 +2026,27 @@ async function downloadExcel() {
         var totalF = 'IF(C'+r+'="Y",FLOOR((VALUE(RIGHT(I'+r+',2))-VALUE(LEFT(I'+r+',2))+1)*IF(E'+r+'="",1,VALUE(E'+r+')),0.01),0)';
 
         // Col K (11): ㉔청년등 근무개월수 — formula (전체 근무개월수를 인라인 참조)
+        // 2025.1.1 이후 계약: M열(계약체결일 기준 청년) + N열(청년제외시점) 사용
+        // 2025.1.1 이전 계약: 과세연도 기준 만35세 생일을 제외시점으로 사용 (매월말 기준 근사)
+        var age35F = '(LEFT(A'+r+',4)+35)*10000+VALUE(RIGHT(A'+r+',4))';
         FC(r, 11,
           'IF(C'+r+'<>"Y",0,' +
             'IF(OR(O'+r+'="Y",P'+r+'="Y",Q'+r+'="Y",R'+r+'="Y",S'+r+'="Y",T'+r+'="Y"),'+totalF+',' +
-              'IF(M'+r+'<>"Y",0,' +
-                'IF(N'+r+'="",'+totalF+',' +
-                  'IF(IFERROR(VALUE(N'+r+'),0)<'+yearStart+',0,' +
-                    'IF(VALUE(N'+r+')>'+yearEnd+','+totalF+',' +
-                      'FLOOR(MAX(0,MIN(VALUE(RIGHT(I'+r+',2)),VALUE(MID(N'+r+',5,2))-1)-VALUE(LEFT(I'+r+',2))+1)*IF(E'+r+'="",1,VALUE(E'+r+')),0.01)' +
+              'IF(IFERROR(VALUE(H'+r+'),0)>=20250101,' +
+                'IF(M'+r+'<>"Y",0,' +
+                  'IF(N'+r+'="",'+totalF+',' +
+                    'IF(IFERROR(VALUE(N'+r+'),0)<'+yearStart+',0,' +
+                      'IF(VALUE(N'+r+')>'+yearEnd+','+totalF+',' +
+                        'FLOOR(MAX(0,MIN(VALUE(RIGHT(I'+r+',2)),VALUE(MID(N'+r+',5,2))-1)-VALUE(LEFT(I'+r+',2))+1)*IF(E'+r+'="",1,VALUE(E'+r+')),0.01)' +
+                      ')' +
+                    ')' +
+                  ')' +
+                ')' +
+              ',' +
+                'IF(A'+r+'="",0,' +
+                  'IF('+age35F+'<='+yearStart+',0,' +
+                    'IF('+age35F+'>'+yearEnd+','+totalF+',' +
+                      'FLOOR(MAX(0,MIN(VALUE(RIGHT(I'+r+',2)),VALUE(MID(TEXT('+age35F+',"00000000"),5,2))-1)-VALUE(LEFT(I'+r+',2))+1)*IF(E'+r+'="",1,VALUE(E'+r+')),0.01)' +
                     ')' +
                   ')' +
                 ')' +
@@ -1970,15 +2107,26 @@ async function downloadExcel() {
         }
         // 전체 근무개월수 수식 (J+K 계산 기반) — K에서 인라인 사용
         var totalF = 'IF(C'+r+'="Y",FLOOR((VALUE(RIGHT(I'+r+',2))-VALUE(LEFT(I'+r+',2))+1)*IF(E'+r+'="",1,VALUE(E'+r+')),0.01),0)';
-        // Col K (11): ㉔청년등 근무개월수 — formula (전체 근무개월수를 인라인 참조)
+        // Col K (11): ㉔청년등 근무개월수 — formula (빈 행, 데이터 행과 동일 로직)
+        var age35F = '(LEFT(A'+r+',4)+35)*10000+VALUE(RIGHT(A'+r+',4))';
         FC(r, 11,
           'IF(C'+r+'<>"Y",0,' +
             'IF(OR(O'+r+'="Y",P'+r+'="Y",Q'+r+'="Y",R'+r+'="Y",S'+r+'="Y",T'+r+'="Y"),'+totalF+',' +
-              'IF(M'+r+'<>"Y",0,' +
-                'IF(N'+r+'="",'+totalF+',' +
-                  'IF(IFERROR(VALUE(N'+r+'),0)<'+yearStart+',0,' +
-                    'IF(VALUE(N'+r+')>'+yearEnd+','+totalF+',' +
-                      'FLOOR(MAX(0,MIN(VALUE(RIGHT(I'+r+',2)),VALUE(MID(N'+r+',5,2))-1)-VALUE(LEFT(I'+r+',2))+1)*IF(E'+r+'="",1,VALUE(E'+r+')),0.01)' +
+              'IF(IFERROR(VALUE(H'+r+'),0)>=20250101,' +
+                'IF(M'+r+'<>"Y",0,' +
+                  'IF(N'+r+'="",'+totalF+',' +
+                    'IF(IFERROR(VALUE(N'+r+'),0)<'+yearStart+',0,' +
+                      'IF(VALUE(N'+r+')>'+yearEnd+','+totalF+',' +
+                        'FLOOR(MAX(0,MIN(VALUE(RIGHT(I'+r+',2)),VALUE(MID(N'+r+',5,2))-1)-VALUE(LEFT(I'+r+',2))+1)*IF(E'+r+'="",1,VALUE(E'+r+')),0.01)' +
+                      ')' +
+                    ')' +
+                  ')' +
+                ')' +
+              ',' +
+                'IF(A'+r+'="",0,' +
+                  'IF('+age35F+'<='+yearStart+',0,' +
+                    'IF('+age35F+'>'+yearEnd+','+totalF+',' +
+                      'FLOOR(MAX(0,MIN(VALUE(RIGHT(I'+r+',2)),VALUE(MID(TEXT('+age35F+',"00000000"),5,2))-1)-VALUE(LEFT(I'+r+',2))+1)*IF(E'+r+'="",1,VALUE(E'+r+')),0.01)' +
                     ')' +
                   ')' +
                 ')' +
