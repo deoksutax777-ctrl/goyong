@@ -659,10 +659,12 @@ function readExcel(file, key, fname) {
             age60plus: 0,
           });
 
-          // 제외사유 → reasonEdits + override
+          // 제외사유 → reasonEdits + override (줄임말도 정식 코드로 매핑)
+          const rMap = {'임원':'ⓒ 임원','친족':'ⓓ 최대주주·친족','최대주주':'ⓓ 최대주주·친족','단시간':'ⓑ 단시간','기타':'ⓕ 기타','1년미만':'ⓐ 근로계약1년미만','근로계약1년미만':'ⓐ 근로계약1년미만','원천징수미확인':'ⓔ 원천징수미확인'};
+          const mappedReason = reason ? (rMap[reason.trim()] || reason) : '';
           const eKey = setKey + ':' + code;
-          if (reason) {
-            reasonEdits[eKey] = reason;
+          if (mappedReason) {
+            reasonEdits[eKey] = mappedReason;
             overrides[eKey] = 'N';
           }
           // 단시간유형
@@ -971,8 +973,20 @@ function parseEmployees(rows) {
         const birthStr = colBirth >= 0 ? String(r[colBirth]).replace(/\D/g,'') : '';
 
         // 상시근로자 판정: regularYN이 명시적 'N'이면 비상시, reason이 있으면 비상시
-        let templateReason = reason;
-        if (regularYN === 'N' && !reason) templateReason = '기타';  // N인데 제외사유 없으면 기타로 설정
+        // 템플릿 줄임말 → 드롭다운 정식 코드 매핑
+        const reasonMap = {
+          '근로계약1년미만': 'ⓐ 근로계약1년미만', '1년미만': 'ⓐ 근로계약1년미만',
+          '단시간': 'ⓑ 단시간',
+          '임원': 'ⓒ 임원',
+          '최대주주': 'ⓓ 최대주주·친족', '친족': 'ⓓ 최대주주·친족', '최대주주·친족': 'ⓓ 최대주주·친족',
+          '원천징수미확인': 'ⓔ 원천징수미확인',
+          '기타': 'ⓕ 기타',
+          'ⓐ 근로계약1년미만': 'ⓐ 근로계약1년미만', 'ⓑ 단시간': 'ⓑ 단시간',
+          'ⓒ 임원': 'ⓒ 임원', 'ⓓ 최대주주·친족': 'ⓓ 최대주주·친족',
+          'ⓔ 원천징수미확인': 'ⓔ 원천징수미확인', 'ⓕ 기타': 'ⓕ 기타',
+        };
+        let templateReason = reason ? (reasonMap[reason.trim()] || 'ⓕ 기타') : '';
+        if (regularYN === 'N' && !templateReason) templateReason = 'ⓕ 기타';  // N인데 제외사유 없으면 기타로 설정
 
         employees.push({
           code: String(i),
