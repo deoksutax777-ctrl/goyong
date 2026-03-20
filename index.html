@@ -800,7 +800,11 @@ function parseEmployees(rows) {
     if (isTemplate) {
       const colBirth   = findCol(['생년월일']);
       const colName    = findCol(['성명', '사원명']);
-      const colRegular = findCol(['상시근로자여부', '상시근로자']);  // 상시근로자 Y/N (선택)
+      // 상시근로자 Y/N 컬럼: 정확히 일치하는 헤더만 (부분일치 시 '상시근로자제외사유'에 오매칭 방지)
+      const colRegular = headerStr.findIndex(h => {
+        const t = h.trim();
+        return t === '상시근로자' || t === '상시근로자여부' || t === '상시근로자(Y/N)' || t === '상시근로자(N/Y)';
+      });
       const colReason  = findCol(['상시근로자제외사유', '제외사유']);
       const colShort   = findCol(['단시간근로자유형', '단시간']);
       const colDom     = findCol(['내국인']);
