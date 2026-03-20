@@ -571,11 +571,17 @@ function guessExec(pos)    { return EXEC_KEYWORDS.some(k => pos.includes(k)); }
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // FILE HANDLING
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function clearEditsForKey(key) {
+  Object.keys(overrides).forEach(k => { if (k.startsWith(key+':')) delete overrides[k]; });
+  Object.keys(reasonEdits).forEach(k => { if (k.startsWith(key+':')) delete reasonEdits[k]; });
+  Object.keys(shortTimeEdits).forEach(k => { if (k.startsWith(key+':')) delete shortTimeEdits[k]; });
+  Object.keys(ynEdits).forEach(k => { if (k.startsWith(key+':')) delete ynEdits[k]; });
+}
 function handleFile(input, key) {
   const file = input.files[0];
   if (!file) return;
   // 새 파일 업로드 시 해당 set의 오버라이드 초기화
-  Object.keys(overrides).forEach(k => { if (k.startsWith(key+':')) delete overrides[k]; });
+  clearEditsForKey(key);
   readExcel(file, key, file.name);
 }
 
@@ -605,6 +611,96 @@ function readExcel(file, key, fname) {
     const wb = XLSX.read(e.target.result, { type: 'binary', cellDates: false });
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+    // ── 포맷C 감지: 자체 출력 템플릿 (⑭생년월일, ⑮성명 등 원문자 헤더) ──
+    const templateHeaderRows = [];
+    for (let i = 0; i < Math.min(rows.length, 100); i++) {
+      if (Array.isArray(rows[i]) && rows[i].some(cell => String(cell).includes('⑭'))) {
+        templateHeaderRows.push(i);
+      }
+    }
+
+    if (templateHeaderRows.length > 0) {
+      // 템플릿 재업로드: 기존 편집 상태 초기화 후 당기/직전 섹션 파싱
+      clearEditsForKey('cur');
+      clearEditsForKey('prev');
+      const loadSection = (headerIdx, setKey) => {
+        const dataStart = headerIdx + 2; // 헤더 2행 아래부터 데이터
+        const emps = [];
+        for (let i = dataStart; i < dataStart + 70 && i < rows.length; i++) {
+          const r = rows[i];
+          if (!r) continue;
+          const name = String(r[1] || '').trim();
+          if (!name) continue;
+          const birthStr = String(r[0] || '').replace(/\D/g, '');
+          if (birthStr.length !== 8) continue;
+
+          const code = String(emps.length + 1);
+          const reason = String(r[3] || '').trim();
+          const shortTime = String(r[4] || '').trim();
+          const domestic = String(r[5] || '').trim();
+          const metro = String(r[6] || '').trim();
+          const hireStr = String(r[7] || '').replace(/\D/g, '');
+
+          // SSN 복원 (생년월일 YYYYMMDD → YYMMDD + 성별코드)
+          const yy = birthStr.substring(2, 4);
+          const mmdd = birthStr.substring(4, 8);
+          const gd = parseInt(birthStr.substring(0, 4)) >= 2000 ? '3' : '1';
+          const ssn = yy + mmdd + gd + '000000';
+
+          emps.push({
+            code, name, ssn,
+            foreigner: domestic === 'Y' ? '내국인' : '외국인',
+            hire_date: hireStr,
+            resign_date: '',
+            dept: '', position: '',
+            employ_insur: '여',
+            disabled: String(r[14] || 'N') === 'Y' ? 1 : 0,
+            age60plus: 0,
+          });
+
+          // 제외사유 → reasonEdits + override
+          const eKey = setKey + ':' + code;
+          if (reason) {
+            reasonEdits[eKey] = reason;
+            overrides[eKey] = 'N';
+          }
+          // 단시간유형
+          if (shortTime === '0.5' || shortTime === '0.75') {
+            shortTimeEdits[eKey] = shortTime;
+          }
+          // Y/N 오버라이드 (자동판정 불가 항목: 수도권, 특수카테고리)
+          if (metro) ynEdits[eKey + ':metro'] = metro;
+          if (String(r[16] || '') === 'Y') ynEdits[eKey + ':career'] = 'Y';
+          if (String(r[17] || '') === 'Y') ynEdits[eKey + ':nkDefector'] = 'Y';
+          if (String(r[18] || '') === 'Y') ynEdits[eKey + ':regularConvert'] = 'Y';
+          if (String(r[19] || '') === 'Y') ynEdits[eKey + ':childcareReturn'] = 'Y';
+        }
+        return emps;
+      };
+
+      // 첫 번째 헤더 = 당기, 두 번째 = 직전
+      if (templateHeaderRows.length >= 1) {
+        empData.cur = loadSection(templateHeaderRows[0], 'cur');
+        const el1 = document.getElementById('filename-cur');
+        el1.textContent = fname + ' (당기)';
+        el1.style.display = 'inline-block';
+        document.getElementById('drop-cur').classList.add('has-file');
+      }
+      if (templateHeaderRows.length >= 2) {
+        empData.prev = loadSection(templateHeaderRows[1], 'prev');
+        const el2 = document.getElementById('filename-prev');
+        el2.textContent = fname + ' (직전)';
+        el2.style.display = 'inline-block';
+        document.getElementById('drop-prev').classList.add('has-file');
+      }
+
+      renderCheckboxes();
+      if (empData.cur || empData.prev) calculate();
+      return;
+    }
+
+    // ── 기존 파싱 (포맷A: 더존 / 포맷B: 위하고) ──
     const parsed = parseEmployees(rows);
     empData[key] = parsed;
 
