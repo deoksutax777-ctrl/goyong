@@ -1612,6 +1612,58 @@ function calculate() {
     nonYouthMetro: prevAgg.nonYouthMetro,
     nonYouthLocal: prevAgg.nonYouthLocal
   }));
+
+  // sessionStorage에 전체 상태 저장 → 페이지 이동 후 복원용
+  saveState();
+}
+
+function saveState() {
+  try {
+    sessionStorage.setItem('goyong_state', JSON.stringify({
+      empData, overrides, ynEdits, shortTimeEdits, reasonEdits,
+      metroDepts: [...metroDepts], execPositions: [...execPositions],
+      allDepts: [...allDepts], allPositions: [...allPositions],
+      taxYear: document.getElementById('tax-year').value,
+      corpType: document.getElementById('corp-type').value,
+      companyName: document.getElementById('company-name').value,
+    }));
+  } catch(e) { /* 용량 초과 시 무시 */ }
+}
+
+function restoreState() {
+  try {
+    const raw = sessionStorage.getItem('goyong_state');
+    if (!raw) return false;
+    const s = JSON.parse(raw);
+    empData = s.empData || { cur: null, prev: null };
+    overrides = s.overrides || {};
+    ynEdits = s.ynEdits || {};
+    shortTimeEdits = s.shortTimeEdits || {};
+    reasonEdits = s.reasonEdits || {};
+    metroDepts = new Set(s.metroDepts || []);
+    execPositions = new Set(s.execPositions || []);
+    allDepts = new Set(s.allDepts || []);
+    allPositions = new Set(s.allPositions || []);
+    if (s.taxYear) document.getElementById('tax-year').value = s.taxYear;
+    if (s.corpType) document.getElementById('corp-type').value = s.corpType;
+    if (s.companyName) document.getElementById('company-name').value = s.companyName;
+    // UI 복원
+    if (empData.cur) {
+      const el = document.getElementById('filename-cur');
+      el.textContent = '(복원됨)';
+      el.style.display = 'inline-block';
+      document.getElementById('drop-cur').classList.add('has-file');
+    }
+    if (empData.prev) {
+      const el = document.getElementById('filename-prev');
+      el.textContent = '(복원됨)';
+      el.style.display = 'inline-block';
+      document.getElementById('drop-prev').classList.add('has-file');
+    }
+    renderCheckboxes();
+    calculate();
+    return true;
+  } catch(e) { return false; }
 }
 
 // 오버라이드 토글 (테이블에서 호출)
@@ -2369,6 +2421,9 @@ async function downloadExcel() {
     btn.innerHTML = '<span class="dl-icon">⬇</span> 엑셀 다운로드';
   }
 }
+
+// 페이지 로드 시 sessionStorage에서 상태 복원
+restoreState();
 </script>
 
 <!-- ── 푸터 ──────────────────────────── -->
