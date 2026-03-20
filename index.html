@@ -1393,12 +1393,20 @@ function calcAgg(processed) {
 
   const nonYouthWorkerCount = workerCount - youthWorkerCount;
 
+  // 수도권/비수도권 분리 집계 (세액공제 계산기 연동용)
+  const active = processed.filter(e => e.regular === 'Y');
+  const youthMetro    = active.filter(e => e.metro === 'Y').reduce((s,e) => s + truncHundredth(e.youthMonths / months12), 0);
+  const youthLocal    = active.filter(e => e.metro !== 'Y').reduce((s,e) => s + truncHundredth(e.youthMonths / months12), 0);
+  const nonYouthMetro = active.filter(e => e.metro === 'Y').reduce((s,e) => s + truncHundredth((e.regularMonths + e.youthMonths) / months12), 0) - youthMetro;
+  const nonYouthLocal = active.filter(e => e.metro !== 'Y').reduce((s,e) => s + truncHundredth((e.regularMonths + e.youthMonths) / months12), 0) - youthLocal;
+
   return {
     totalMonths, months12, workerCount,
     youthTotalMonths, disabledMonths, elderlyMonths,
     careerMonths, nkDefectorMonths,
     youthTotalSum: youthTotalMonths + disabledMonths + elderlyMonths + careerMonths + nkDefectorMonths,
-    youthWorkerCount, nonYouthWorkerCount
+    youthWorkerCount, nonYouthWorkerCount,
+    youthMetro, youthLocal, nonYouthMetro, nonYouthLocal
   };
 }
 
@@ -1585,16 +1593,24 @@ function calculate() {
   window._lastResult = { curProcessed, prevProcessed, curAgg, prevAgg, taxYear };
   document.getElementById('btn-excel').disabled = false;
 
-  // localStorage에 저장 → calc_test.html 연동용
+  // localStorage에 저장 → calc_test.html 연동용 (수도권/비수도권 분리)
   localStorage.setItem('goyong_new_' + taxYear, JSON.stringify({
     workerCount: curAgg.workerCount,
     youthWorkerCount: curAgg.youthWorkerCount,
-    nonYouthWorkerCount: curAgg.nonYouthWorkerCount
+    nonYouthWorkerCount: curAgg.nonYouthWorkerCount,
+    youthMetro: curAgg.youthMetro,
+    youthLocal: curAgg.youthLocal,
+    nonYouthMetro: curAgg.nonYouthMetro,
+    nonYouthLocal: curAgg.nonYouthLocal
   }));
   localStorage.setItem('goyong_new_' + prevYear, JSON.stringify({
     workerCount: prevAgg.workerCount,
     youthWorkerCount: prevAgg.youthWorkerCount,
-    nonYouthWorkerCount: prevAgg.nonYouthWorkerCount
+    nonYouthWorkerCount: prevAgg.nonYouthWorkerCount,
+    youthMetro: prevAgg.youthMetro,
+    youthLocal: prevAgg.youthLocal,
+    nonYouthMetro: prevAgg.nonYouthMetro,
+    nonYouthLocal: prevAgg.nonYouthLocal
   }));
 }
 

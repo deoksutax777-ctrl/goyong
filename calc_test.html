@@ -872,17 +872,27 @@ function loadFromSpec() {
       if(!raw) { missing.push(y+'년('+( regType==='old'?'종전':'개정')+')'); return; }
 
       const d = JSON.parse(raw);
-      // 청년 → 수도권(ym)에, 비청년 → 수도권(nm)에 넣기 (중소는 사용자가 비수도권으로 재배분)
+      const hasMetroData = d.youthMetro !== undefined;
       const ymEl = document.getElementById('w'+startY+'-'+y+'-ym');
       const nmEl = document.getElementById('w'+startY+'-'+y+'-nm');
-      if(ymEl) { ymEl.value = d.youthWorkerCount; filled++; }
-      if(nmEl) { nmEl.value = d.nonYouthWorkerCount; filled++; }
-      // 비수도권은 0으로 초기화
-      if(isS) {
+      if(isS && hasMetroData) {
+        // 수도권/비수도권 분리 데이터가 있으면 자동 배분
+        if(ymEl) { ymEl.value = d.youthMetro; filled++; }
+        if(nmEl) { nmEl.value = d.nonYouthMetro; filled++; }
         const ylEl = document.getElementById('w'+startY+'-'+y+'-yl');
         const nlEl = document.getElementById('w'+startY+'-'+y+'-nl');
-        if(ylEl) ylEl.value = 0;
-        if(nlEl) nlEl.value = 0;
+        if(ylEl) { ylEl.value = d.youthLocal; filled++; }
+        if(nlEl) { nlEl.value = d.nonYouthLocal; filled++; }
+      } else {
+        // 수도권/비수도권 미분리: 전체를 수도권에 (중견/대기업은 구분 불필요)
+        if(ymEl) { ymEl.value = d.youthWorkerCount; filled++; }
+        if(nmEl) { nmEl.value = d.nonYouthWorkerCount; filled++; }
+        if(isS) {
+          const ylEl = document.getElementById('w'+startY+'-'+y+'-yl');
+          const nlEl = document.getElementById('w'+startY+'-'+y+'-nl');
+          if(ylEl) ylEl.value = 0;
+          if(nlEl) nlEl.value = 0;
+        }
       }
     });
   });
@@ -893,7 +903,7 @@ function loadFromSpec() {
   if(filled > 0 && missing.length === 0) {
     statusEl.style.background = 'var(--accent2-light)';
     statusEl.style.color = 'var(--accent2)';
-    statusEl.innerHTML = '명세서 데이터를 모두 가져왔습니다.' + (isS ? ' <strong>중소기업</strong>: 전체 인원이 수도권에 입력되었습니다. 비수도권이 있으면 직접 배분해주세요.' : '');
+    statusEl.innerHTML = '명세서 데이터를 모두 가져왔습니다.' + (isS ? ' <strong>중소기업</strong>: 수도권/비수도권이 자동 배분되었습니다.' : '');
   } else if(filled > 0) {
     statusEl.style.background = 'var(--orange-light)';
     statusEl.style.color = '#856404';
