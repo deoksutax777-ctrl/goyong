@@ -276,15 +276,21 @@ function maxZ(w) { return { ym: Math.max(0,w.ym), yl: Math.max(0,w.yl), nm: Math
 // 당기공제
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function calcDanggi(corp, diff) {
-  const r = RATES[corp], rawInc = maxZ(diff);
-  // 전체 증가인원 cap (청년 우선 배정)
-  const totalDiff = diff.ym + diff.yl + diff.nm + diff.nl;
-  const totalCap = Math.max(0, totalDiff);
-  const yT = rawInc.ym + rawInc.yl, nT = rawInc.nm + rawInc.nl;
-  const capY = Math.min(yT, totalCap);
-  const capN = Math.min(nT, totalCap - capY);
-  const yR = yT > 0 ? capY / yT : 0, nR = nT > 0 ? capN / nT : 0;
-  const inc = { ym: truncW(rawInc.ym*yR), yl: truncW(rawInc.yl*yR), nm: truncW(rawInc.nm*nR), nl: truncW(rawInc.nl*nR) };
+  const r = RATES[corp];
+  // 지역별 cap: 수도권/비수도권 각각 순증 한도 적용
+  const metroDiff = diff.ym + diff.nm;
+  const localDiff = diff.yl + diff.nl;
+  const metroCap = Math.max(0, metroDiff);
+  const localCap = Math.max(0, localDiff);
+  const rawYm = Math.max(0, diff.ym), rawNm = Math.max(0, diff.nm);
+  const rawYl = Math.max(0, diff.yl), rawNl = Math.max(0, diff.nl);
+  // 수도권: 청년 우선 배정
+  const capYm = Math.min(rawYm, metroCap);
+  const capNm = Math.min(rawNm, metroCap - capYm);
+  // 비수도권: 청년 우선 배정
+  const capYl = Math.min(rawYl, localCap);
+  const capNl = Math.min(rawNl, localCap - capYl);
+  const inc = { ym: truncW(capYm), yl: truncW(capYl), nm: truncW(capNm), nl: truncW(capNl) };
   const amt = { ym: truncAmt(inc.ym*r.youth.metro), yl: truncAmt(inc.yl*r.youth.local), nm: truncAmt(inc.nm*r.normal.metro), nl: truncAmt(inc.nl*r.normal.local) };
   return { inc, amt, total: amt.ym+amt.yl+amt.nm+amt.nl };
 }
@@ -877,16 +883,16 @@ function loadFromSpec(auto) {
       const nmEl = document.getElementById('w'+startY+'-'+y+'-nm');
       if(isS && hasMetroData) {
         // 수도권/비수도권 분리 데이터가 있으면 자동 배분
-        if(ymEl) { ymEl.value = d.youthMetro; filled++; }
-        if(nmEl) { nmEl.value = d.nonYouthMetro; filled++; }
+        if(ymEl) { ymEl.value = truncW(d.youthMetro); filled++; }
+        if(nmEl) { nmEl.value = truncW(d.nonYouthMetro); filled++; }
         const ylEl = document.getElementById('w'+startY+'-'+y+'-yl');
         const nlEl = document.getElementById('w'+startY+'-'+y+'-nl');
-        if(ylEl) { ylEl.value = d.youthLocal; filled++; }
-        if(nlEl) { nlEl.value = d.nonYouthLocal; filled++; }
+        if(ylEl) { ylEl.value = truncW(d.youthLocal); filled++; }
+        if(nlEl) { nlEl.value = truncW(d.nonYouthLocal); filled++; }
       } else {
         // 수도권/비수도권 미분리: 전체를 수도권에 (중견/대기업은 구분 불필요)
-        if(ymEl) { ymEl.value = d.youthWorkerCount; filled++; }
-        if(nmEl) { nmEl.value = d.nonYouthWorkerCount; filled++; }
+        if(ymEl) { ymEl.value = truncW(d.youthWorkerCount); filled++; }
+        if(nmEl) { nmEl.value = truncW(d.nonYouthWorkerCount); filled++; }
         if(isS) {
           const ylEl = document.getElementById('w'+startY+'-'+y+'-yl');
           const nlEl = document.getElementById('w'+startY+'-'+y+'-nl');
