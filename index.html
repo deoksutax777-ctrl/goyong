@@ -1326,9 +1326,11 @@ function processEmployees(employees, taxYear, corpType) {
       potentialRegularMonths,
       potentialYouthMonths,
       shortTimeType: emp._templateShortTime || '',
-      isYouthYear: isYouthYear ? 'Y' : 'N',
+      isYouthYear: (isYouthYear || isPreAmendYouth) ? 'Y' : 'N',
       isYouthHire: isYouthHire ? 'Y' : 'N',
-      youthExclude: (isYouthHire && youthExclude) ? youthExclude : '',
+      youthExclude: (isYouthHire && youthExclude) ? youthExclude
+        : (isPreAmendYouth && birthDate) ? formatDate(new Date(birthDate.getFullYear() + 35, birthDate.getMonth(), birthDate.getDate()))
+        : '',
       isDisabled: isDisabled ? 'Y' : 'N',
       isElderly: elderlyAtHire ? 'Y' : 'N',
       elderlyAtHire,
