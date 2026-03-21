@@ -2310,12 +2310,21 @@ async function downloadExcel() {
         //   입사+유지  = (근로계약체결일 왼쪽4자리+유지기간) & 근로계약체결일 오른쪽4자리
         //   제외시점   = MAX(만35세생일, 입사+유지)
         var keepFormula = 'IF('+taxYearForFormula+'=2025,IF($N$3="대기업",2,3),IF($N$3="대기업",3,4))';
-        var youthExclFormula =
+        // 2025년 이후 계약: M열="Y"일 때 MAX(만35세, 입사+유지기간)
+        // 2025년 이전 계약: 만35세 생일이 과세연도 이후이면 표시
+        var age35Num = '(LEFT(A'+r+',4)+35)*10000+VALUE(RIGHT(A'+r+',4))';
+        var postAmendF =
           'IF(OR(M'+r+'<>"Y",A'+r+'="",H'+r+'=""),"",' +
             'TEXT(MAX(' +
-              '(LEFT(A'+r+',4)+35)*10000+VALUE(RIGHT(A'+r+',4)),' +
+              age35Num+',' +
               '(LEFT(H'+r+',4)+'+keepFormula+')*10000+VALUE(RIGHT(H'+r+',4))' +
             '),"00000000"))';
+        var preAmendF =
+          'IF(OR(A'+r+'="",'+age35Num+'<'+taxYearForFormula+'*10000+101),"",TEXT('+age35Num+',"00000000"))';
+        var youthExclFormula =
+          'IF(A'+r+'="","",IF(IFERROR(VALUE(H'+r+'),0)>=20250101,' +
+            postAmendF+',' +
+            preAmendF+'))';
         FC(r, 14, youthExclFormula);
         var cellN = ws.getCell(r, 14);
         cellN.fill = {type:'pattern', pattern:'solid', fgColor:{argb:bg}};
@@ -2379,13 +2388,20 @@ async function downloadExcel() {
           '0');
         // Col N (14): ㉗청년제외시점 — 수식 (빈 행)
         var keepFormula2 = 'IF('+taxYearForFormula+'=2025,IF($N$3="대기업",2,3),IF($N$3="대기업",3,4))';
-        var youthExclFormula =
+        var age35Num2 = '(LEFT(A'+r+',4)+35)*10000+VALUE(RIGHT(A'+r+',4))';
+        var postAmendF2 =
           'IF(OR(M'+r+'<>"Y",A'+r+'="",H'+r+'=""),"",' +
             'TEXT(MAX(' +
-              '(LEFT(A'+r+',4)+35)*10000+VALUE(RIGHT(A'+r+',4)),' +
+              age35Num2+',' +
               '(LEFT(H'+r+',4)+'+keepFormula2+')*10000+VALUE(RIGHT(H'+r+',4))' +
             '),"00000000"))';
-        FC(r, 14, youthExclFormula);
+        var preAmendF2 =
+          'IF(OR(A'+r+'="",'+age35Num2+'<'+taxYearForFormula+'*10000+101),"",TEXT('+age35Num2+',"00000000"))';
+        var youthExclFormula2 =
+          'IF(A'+r+'="","",IF(IFERROR(VALUE(H'+r+'),0)>=20250101,' +
+            postAmendF2+',' +
+            preAmendF2+'))';
+        FC(r, 14, youthExclFormula2);
       }
     }
 
