@@ -950,164 +950,202 @@ async function exportExcel() {
   if (!lastAll || lastAll.length === 0) { alert('먼저 계산을 실행해주세요.'); return; }
 
   const wb = new ExcelJS.Workbook();
-  const corp = getCorp(), r = RATES[corp], isS = (corp==='중소'), hasN = (corp!=='대기업');
+  const corp = getCorp(), rt = RATES[corp], isS = (corp==='중소'), hasN = (corp!=='대기업');
 
-  const hdrFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1A4FA8'} };
-  const hdrFont = { bold:true, color:{argb:'FFFFFFFF'}, size:10, name:'맑은 고딕' };
-  const subHdrFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE8EEF8'} };
-  const subHdrFont = { bold:true, size:10, name:'맑은 고딕' };
-  const bodyFont = { size:10, name:'맑은 고딕' };
-  const numFmt = '#,##0';
-  const numFmt2 = '#,##0.00';
-  const thinBorder = { top:{style:'thin'}, bottom:{style:'thin'}, left:{style:'thin'}, right:{style:'thin'} };
-  const warnFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFFDF0EE'} };
-  const greenFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE6F4F0'} };
+  // 색상 팔레트: 채도 높은 파란색 단조롭게
+  const C = {
+    dark:   'FF1B3A8C',  // 진한 파랑 (제목)
+    pri:    'FF2255CC',  // 기본 파랑 (헤더)
+    mid:    'FF4477DD',  // 중간 파랑 (합계행)
+    light:  'FFDCE6F8',  // 연한 파랑 (짝수행)
+    pale:   'FFEEF3FC',  // 아주 연한 파랑 (단가 배경)
+    white:  'FFFFFFFF',
+    black:  'FF1A1A2E',
+    muted:  'FF556688',
+    red:    'FFC0392B',
+  };
+  const F = (sz, bold, color) => ({ name:'맑은 고딕', size: sz||10, bold:!!bold, color: color ? {argb:color} : {argb:C.black} });
+  const fill = argb => ({ type:'pattern', pattern:'solid', fgColor:{argb} });
+  const border = { top:{style:'thin',color:{argb:'FFB0C4E8'}}, bottom:{style:'thin',color:{argb:'FFB0C4E8'}}, left:{style:'thin',color:{argb:'FFB0C4E8'}}, right:{style:'thin',color:{argb:'FFB0C4E8'}} };
+  const nf = '#,##0', nf2 = '#,##0.00';
 
-  function styleRow(ws, rowNum, fill, font) {
-    const row = ws.getRow(rowNum);
-    row.eachCell(c => { c.fill = fill; c.font = font; c.border = thinBorder; c.alignment = {vertical:'middle'}; });
+  function initWs(ws) {
+    ws.views = [{ showGridLines: false }];
+  }
+  function hdrRow(ws, rn, cols) {
+    cols.forEach((v,i) => {
+      const c = ws.getCell(String.fromCharCode(65+i)+rn);
+      c.value = v; c.font = F(10,true,C.white); c.fill = fill(C.pri); c.border = border;
+      c.alignment = { vertical:'middle', horizontal:'center', wrapText:true };
+    });
+    ws.getRow(rn).height = 22;
+  }
+  function dataCell(ws, rn, ci, v, fmt) {
+    const c = ws.getCell(String.fromCharCode(65+ci)+rn);
+    c.value = v; c.font = F(10); c.border = border; if(fmt) c.numFmt = fmt;
+    c.alignment = { vertical:'middle', horizontal: typeof v==='number'?'right':'left' };
+    return c;
+  }
+  function stripeRow(ws, rn, colCnt, isEven) {
+    if (!isEven) return;
+    for (let i=0; i<colCnt; i++) {
+      const c = ws.getCell(String.fromCharCode(65+i)+rn);
+      if (!c.fill || !c.fill.fgColor) c.fill = fill(C.light);
+    }
+  }
+  function totalRow(ws, rn, colCnt) {
+    for (let i=0; i<colCnt; i++) {
+      const c = ws.getCell(String.fromCharCode(65+i)+rn);
+      c.fill = fill(C.mid); c.font = F(10,true,C.white); c.border = border;
+      c.alignment = { vertical:'middle', horizontal: typeof c.value==='number'?'right':'left' };
+    }
+    ws.getRow(rn).height = 22;
   }
 
   // ── 시작연도별 산출내역 시트 ──
   lastAll.forEach(({startY, danggi, tl}) => {
     const ws = wb.addWorksheet(startY+'년 산출');
+    initWs(ws);
     const totalCredit = tl.reduce((s,t) => s+(t.hasData?t.credit:0), 0);
     const totalChug = tl.reduce((s,t) => s+(t.hasData?t.chugjing:0), 0);
+    const maxCol = isS ? 11 : (hasN ? 9 : 8);
+    const lastColLetter = String.fromCharCode(64+maxCol);
 
     // 제목
-    ws.mergeCells('A1:H1');
-    const titleCell = ws.getCell('A1');
-    titleCell.value = `통합고용세액공제 산출내역 — ${startY}년 시작 (${corp})`;
-    titleCell.font = { bold:true, size:13, name:'맑은 고딕' };
-    titleCell.alignment = { vertical:'middle' };
-    ws.getRow(1).height = 28;
+    ws.mergeCells('A1:'+lastColLetter+'1');
+    const tc = ws.getCell('A1');
+    tc.value = `통합고용세액공제 산출내역  ${startY}년 시작 (${corp})`;
+    tc.font = F(14,true,C.white); tc.fill = fill(C.dark);
+    tc.alignment = { vertical:'middle', horizontal:'left' };
+    ws.getRow(1).height = 32;
 
     // 단가 정보
     let r2 = 3;
-    ws.getCell('A'+r2).value = '【적용 단가 (만원)】';
-    ws.getCell('A'+r2).font = { bold:true, size:10, name:'맑은 고딕' };
+    ws.mergeCells('A'+r2+':B'+r2);
+    ws.getCell('A'+r2).value = '적용 단가 (만원)';
+    ws.getCell('A'+r2).font = F(10,true); ws.getCell('A'+r2).fill = fill(C.pale);
+    ws.getCell('A'+r2).border = border; ws.getCell('B'+r2).border = border;
     r2++;
     if (isS) {
-      ws.getCell('A'+r2).value = '청년 수도권'; ws.getCell('B'+r2).value = r.youth.metro;
-      ws.getCell('C'+r2).value = '청년 비수도권'; ws.getCell('D'+r2).value = r.youth.local;
+      ['A','B','C','D'].forEach(l => { ws.getCell(l+r2).fill = fill(C.pale); ws.getCell(l+r2).border = border; });
+      ws.getCell('A'+r2).value = '청년 수도권'; ws.getCell('A'+r2).font = F(9,false,C.muted);
+      ws.getCell('B'+r2).value = rt.youth.metro; ws.getCell('B'+r2).font = F(10,true); ws.getCell('B'+r2).numFmt = nf;
+      ws.getCell('C'+r2).value = '청년 비수도권'; ws.getCell('C'+r2).font = F(9,false,C.muted);
+      ws.getCell('D'+r2).value = rt.youth.local; ws.getCell('D'+r2).font = F(10,true); ws.getCell('D'+r2).numFmt = nf;
       r2++;
-      ws.getCell('A'+r2).value = '비청년 수도권'; ws.getCell('B'+r2).value = r.normal.metro;
-      ws.getCell('C'+r2).value = '비청년 비수도권'; ws.getCell('D'+r2).value = r.normal.local;
+      ['A','B','C','D'].forEach(l => { ws.getCell(l+r2).fill = fill(C.pale); ws.getCell(l+r2).border = border; });
+      ws.getCell('A'+r2).value = '비청년 수도권'; ws.getCell('A'+r2).font = F(9,false,C.muted);
+      ws.getCell('B'+r2).value = rt.normal.metro; ws.getCell('B'+r2).font = F(10,true); ws.getCell('B'+r2).numFmt = nf;
+      ws.getCell('C'+r2).value = '비청년 비수도권'; ws.getCell('C'+r2).font = F(9,false,C.muted);
+      ws.getCell('D'+r2).value = rt.normal.local; ws.getCell('D'+r2).font = F(10,true); ws.getCell('D'+r2).numFmt = nf;
     } else {
-      ws.getCell('A'+r2).value = '청년'; ws.getCell('B'+r2).value = r.youth.metro;
-      if (hasN) { ws.getCell('C'+r2).value = '비청년'; ws.getCell('D'+r2).value = r.normal.metro; }
+      ['A','B','C','D'].forEach(l => { ws.getCell(l+r2).fill = fill(C.pale); ws.getCell(l+r2).border = border; });
+      ws.getCell('A'+r2).value = '청년'; ws.getCell('A'+r2).font = F(9,false,C.muted);
+      ws.getCell('B'+r2).value = rt.youth.metro; ws.getCell('B'+r2).font = F(10,true); ws.getCell('B'+r2).numFmt = nf;
+      if (hasN) { ws.getCell('C'+r2).value = '비청년'; ws.getCell('C'+r2).font = F(9,false,C.muted); ws.getCell('D'+r2).value = rt.normal.metro; ws.getCell('D'+r2).font = F(10,true); ws.getCell('D'+r2).numFmt = nf; }
     }
-    for (let i=3; i<=r2; i++) ws.getRow(i).eachCell(c => { c.font = bodyFont; });
     r2 += 2;
 
-    // 상시근로자 수 표
-    ws.getCell('A'+r2).value = '【상시근로자 수 (명)】';
-    ws.getCell('A'+r2).font = { bold:true, size:10, name:'맑은 고딕' };
-    r2++;
+    // ── 상시근로자 수 표 ──
     const wHdr = ['연도', '구분'];
     if (isS) wHdr.push('청년(수도권)', '청년(비수도권)', '비청년(수도권)', '비청년(비수도권)', '합계');
     else if (hasN) wHdr.push('청년', '비청년', '합계');
     else wHdr.push('청년', '합계');
-    wHdr.forEach((h, i) => ws.getCell(String.fromCharCode(65+i)+r2).value = h);
-    styleRow(ws, r2, hdrFill, hdrFont);
+    hdrRow(ws, r2, wHdr);
     r2++;
 
-    tl.forEach(item => {
+    tl.forEach((item, idx) => {
       const w = getW(startY, item.year);
-      const col = (i, v) => ws.getCell(String.fromCharCode(65+i)+r2).value = v;
-      col(0, item.year+'년'); col(1, item.role);
+      dataCell(ws, r2, 0, item.year+'년'); dataCell(ws, r2, 1, item.role);
       let ci = 2;
-      if (isS) { col(ci++, w.ym); col(ci++, w.yl); col(ci++, w.nm); col(ci++, w.nl); }
-      else if (hasN) { col(ci++, rp2(w.ym+w.yl)); col(ci++, rp2(w.nm+w.nl)); }
-      else { col(ci++, rp2(w.ym+w.yl)); }
-      col(ci, rp2(totalW(w)));
-      ws.getRow(r2).eachCell(c => { c.font = bodyFont; c.border = thinBorder; c.numFmt = numFmt2; });
-      ws.getCell('A'+r2).numFmt = '@'; ws.getCell('B'+r2).numFmt = '@';
+      if (isS) { dataCell(ws,r2,ci++,w.ym,nf2); dataCell(ws,r2,ci++,w.yl,nf2); dataCell(ws,r2,ci++,w.nm,nf2); dataCell(ws,r2,ci++,w.nl,nf2); }
+      else if (hasN) { dataCell(ws,r2,ci++,rp2(w.ym+w.yl),nf2); dataCell(ws,r2,ci++,rp2(w.nm+w.nl),nf2); }
+      else { dataCell(ws,r2,ci++,rp2(w.ym+w.yl),nf2); }
+      dataCell(ws, r2, ci, rp2(totalW(w)), nf2);
+      stripeRow(ws, r2, wHdr.length, idx%2===1);
       r2++;
     });
     r2++;
 
-    // 산출내역 표
-    ws.getCell('A'+r2).value = '【세액공제 산출내역 (만원)】';
-    ws.getCell('A'+r2).font = { bold:true, size:10, name:'맑은 고딕' };
-    r2++;
+    // ── 세액공제 산출내역 표 ──
     const cHdr = ['연도', '구분'];
-    if (isS) cHdr.push('청년(수도권) 인원', '청년(비수도권) 인원', '비청년(수도권) 인원', '비청년(비수도권) 인원');
+    if (isS) cHdr.push('청년(수도권)', '청년(비수도권)', '비청년(수도권)', '비청년(비수도권)');
     else if (hasN) cHdr.push('청년 인원', '비청년 인원');
     else cHdr.push('청년 인원');
     cHdr.push('공제액', '추징액', '순공제액', '비고');
-    const calcHdrRow = r2;
-    cHdr.forEach((h, i) => ws.getCell(String.fromCharCode(65+i)+r2).value = h);
-    styleRow(ws, r2, hdrFill, hdrFont);
+    hdrRow(ws, r2, cHdr);
     r2++;
 
+    let dIdx = 0;
     tl.forEach(item => {
       if (item.role === '전기') return;
-      const col = (i, v) => ws.getCell(String.fromCharCode(65+i)+r2).value = v;
-      col(0, item.year+'년');
-      col(1, item.role);
+      dataCell(ws, r2, 0, item.year+'년'); dataCell(ws, r2, 1, item.role);
       let ci = 2;
       if (item.role === '당기') {
-        if (isS) { col(ci++, danggi.inc.ym); col(ci++, danggi.inc.yl); col(ci++, danggi.inc.nm); col(ci++, danggi.inc.nl); }
-        else if (hasN) { col(ci++, rp2(danggi.inc.ym+danggi.inc.yl)); col(ci++, rp2(danggi.inc.nm+danggi.inc.nl)); }
-        else { col(ci++, rp2(danggi.inc.ym+danggi.inc.yl)); }
+        if (isS) { dataCell(ws,r2,ci++,danggi.inc.ym,nf2); dataCell(ws,r2,ci++,danggi.inc.yl,nf2); dataCell(ws,r2,ci++,danggi.inc.nm,nf2); dataCell(ws,r2,ci++,danggi.inc.nl,nf2); }
+        else if (hasN) { dataCell(ws,r2,ci++,rp2(danggi.inc.ym+danggi.inc.yl),nf2); dataCell(ws,r2,ci++,rp2(danggi.inc.nm+danggi.inc.nl),nf2); }
+        else { dataCell(ws,r2,ci++,rp2(danggi.inc.ym+danggi.inc.yl),nf2); }
       } else if (item.addtl) {
-        if (isS) { col(ci++, item.addtl.inc.ym); col(ci++, item.addtl.inc.yl); col(ci++, item.addtl.inc.nm); col(ci++, item.addtl.inc.nl); }
-        else if (hasN) { col(ci++, rp2(item.addtl.inc.ym+item.addtl.inc.yl)); col(ci++, rp2(item.addtl.inc.nm+item.addtl.inc.nl)); }
-        else { col(ci++, rp2(item.addtl.inc.ym+item.addtl.inc.yl)); }
+        if (isS) { dataCell(ws,r2,ci++,item.addtl.inc.ym,nf2); dataCell(ws,r2,ci++,item.addtl.inc.yl,nf2); dataCell(ws,r2,ci++,item.addtl.inc.nm,nf2); dataCell(ws,r2,ci++,item.addtl.inc.nl,nf2); }
+        else if (hasN) { dataCell(ws,r2,ci++,rp2(item.addtl.inc.ym+item.addtl.inc.yl),nf2); dataCell(ws,r2,ci++,rp2(item.addtl.inc.nm+item.addtl.inc.nl),nf2); }
+        else { dataCell(ws,r2,ci++,rp2(item.addtl.inc.ym+item.addtl.inc.yl),nf2); }
       }
-      col(ci++, item.credit); col(ci++, item.chugjing); col(ci++, item.credit - item.chugjing);
-      // 비고
+      dataCell(ws, r2, ci++, item.credit, nf);
+      dataCell(ws, r2, ci++, item.chugjing, nf);
+      dataCell(ws, r2, ci++, item.credit - item.chugjing, nf);
       let note = '';
       if (item.addtl && item.addtl.youthDec) note += '청년감소→비청년단가 ';
       if (item.sahu && item.sahu.type !== 'ok') note += '사후관리(' + item.sahu.type + ')';
-      col(ci, note);
-
-      const row = ws.getRow(r2);
-      row.eachCell(c => { c.font = bodyFont; c.border = thinBorder; });
-      // 인원은 소수2자리, 금액은 정수
-      for (let j=2; j<ci-3; j++) ws.getCell(String.fromCharCode(65+j)+r2).numFmt = numFmt2;
-      for (let j=ci-3; j<ci; j++) ws.getCell(String.fromCharCode(65+j)+r2).numFmt = numFmt;
-      if (item.chugjing > 0) row.eachCell(c => { c.fill = warnFill; });
-      r2++;
+      dataCell(ws, r2, ci, note);
+      if (item.chugjing > 0) {
+        for (let j=0; j<cHdr.length; j++) ws.getCell(String.fromCharCode(65+j)+r2).font = F(10,false,C.red);
+      }
+      stripeRow(ws, r2, cHdr.length, dIdx%2===1);
+      dIdx++; r2++;
     });
 
     // 합계행
-    const col = (i, v) => ws.getCell(String.fromCharCode(65+i)+r2).value = v;
-    col(0, '합계'); col(1, '');
+    dataCell(ws, r2, 0, '합계'); dataCell(ws, r2, 1, '');
     let ci = isS ? 6 : (hasN ? 4 : 3);
-    col(ci++, totalCredit); col(ci++, totalChug); col(ci++, totalCredit - totalChug);
-    styleRow(ws, r2, greenFill, subHdrFont);
-    for (let j=ci-3; j<ci; j++) ws.getCell(String.fromCharCode(65+j)+r2).numFmt = numFmt;
+    dataCell(ws, r2, ci++, totalCredit, nf);
+    dataCell(ws, r2, ci++, totalChug, nf);
+    dataCell(ws, r2, ci++, totalCredit - totalChug, nf);
+    totalRow(ws, r2, cHdr.length);
     r2 += 2;
 
     // 검증
     const v = calcVerification(tl, danggi, corp, startY);
     if (v) {
-      ws.getCell('A'+r2).value = '【검증】';
-      ws.getCell('A'+r2).font = { bold:true, size:10, name:'맑은 고딕' };
+      ws.mergeCells('A'+r2+':B'+r2);
+      ws.getCell('A'+r2).value = '검증'; ws.getCell('A'+r2).font = F(10,true,C.white);
+      ws.getCell('A'+r2).fill = fill(C.pri); ws.getCell('A'+r2).border = border;
+      ws.getCell('B'+r2).fill = fill(C.pri); ws.getCell('B'+r2).border = border;
       r2++;
-      ws.getCell('A'+r2).value = '유효증가 인원'; ws.getCell('B'+r2).value = v.totalEffInc; ws.getCell('B'+r2).numFmt = numFmt2;
-      r2++;
-      ws.getCell('A'+r2).value = '연간 공제액'; ws.getCell('B'+r2).value = v.fsPerYear; ws.getCell('B'+r2).numFmt = numFmt;
-      r2++;
-      ws.getCell('A'+r2).value = '적용 연수'; ws.getCell('B'+r2).value = v.numY;
-      r2++;
-      ws.getCell('A'+r2).value = '"처음부터" 합계'; ws.getCell('B'+r2).value = v.fsTotal; ws.getCell('B'+r2).numFmt = numFmt;
-      r2++;
-      ws.getCell('A'+r2).value = '실제 순공제 합계'; ws.getCell('B'+r2).value = v.actualNet; ws.getCell('B'+r2).numFmt = numFmt;
-      r2++;
-      ws.getCell('A'+r2).value = '결과'; ws.getCell('B'+r2).value = v.match ? '검증 통과' : '불일치 (차이: ' + (v.fsTotal-v.actualNet) + '만)';
-      ws.getCell('B'+r2).font = { bold:true, size:10, name:'맑은 고딕', color:{argb: v.match ? 'FF0E7C61' : 'FFC0392B'} };
-      for (let i=r2-6; i<=r2; i++) ws.getRow(i).eachCell(c => { if(!c.font) c.font = bodyFont; });
+      const vRows = [
+        ['유효증가 인원', v.totalEffInc, nf2],
+        ['연간 공제액', v.fsPerYear, nf],
+        ['적용 연수', v.numY, null],
+        ['"처음부터" 합계', v.fsTotal, nf],
+        ['실제 순공제 합계', v.actualNet, nf],
+        ['결과', v.match ? '검증 통과' : '불일치 (차이: '+(v.fsTotal-v.actualNet)+'만)', null],
+      ];
+      vRows.forEach(([label, val, fmt], idx) => {
+        dataCell(ws, r2, 0, label);
+        const vc = dataCell(ws, r2, 1, val, fmt);
+        ws.getCell('A'+r2).font = F(9,false,C.muted);
+        if (label === '결과') vc.font = F(10,true, v.match ? C.pri : C.red);
+        stripeRow(ws, r2, 2, idx%2===1);
+        r2++;
+      });
     }
 
     // 열 너비
-    ws.columns.forEach((col, i) => { col.width = i===0 ? 14 : (i===cHdr.length-1 ? 24 : 16); });
+    ws.columns.forEach((col, i) => { col.width = i===0 ? 14 : (i===cHdr.length-1 ? 22 : 15); });
   });
 
   // ── 종합 매트릭스 시트 ──
   const ws2 = wb.addWorksheet('종합');
+  initWs(ws2);
   const startYears = lastAll.map(a => a.startY);
   const calYearSet = new Set();
   const matrix = {};
@@ -1121,65 +1159,60 @@ async function exportExcel() {
     });
   });
   const calYears = [...calYearSet].sort();
+  const mCols = calYears.length + 2; // A열 + 과세연도들 + 합계
 
-  ws2.mergeCells('A1:' + String.fromCharCode(65+startYears.length+1) + '1');
-  ws2.getCell('A1').value = `통합고용세액공제 종합 매트릭스 (${corp})`;
-  ws2.getCell('A1').font = { bold:true, size:13, name:'맑은 고딕' };
-  ws2.getRow(1).height = 28;
+  // 제목
+  ws2.mergeCells('A1:'+String.fromCharCode(64+mCols)+'1');
+  ws2.getCell('A1').value = `통합고용세액공제 종합 (${corp})`;
+  ws2.getCell('A1').font = F(14,true,C.white); ws2.getCell('A1').fill = fill(C.dark);
+  ws2.getCell('A1').alignment = { vertical:'middle' };
+  ws2.getRow(1).height = 32;
 
-  // 행=시작연도, 열=과세연도 (현재 화면 기본)
+  // 헤더
   let row = 3;
-  ws2.getCell('A'+row).value = '시작연도 \\ 과세연도';
-  calYears.forEach((cy, i) => ws2.getCell(String.fromCharCode(66+i)+row).value = cy+'년');
-  ws2.getCell(String.fromCharCode(66+calYears.length)+row).value = '합계';
-  styleRow(ws2, row, hdrFill, hdrFont);
+  const mHdr = ['시작연도 \\ 과세연도'];
+  calYears.forEach(cy => mHdr.push(cy+'년'));
+  mHdr.push('합계');
+  hdrRow(ws2, row, mHdr);
   row++;
 
   let grandCredit = 0, grandChug = 0;
   const colC = {}, colCh = {};
   calYears.forEach(cy => { colC[cy]=0; colCh[cy]=0; });
 
-  startYears.forEach(sy => {
-    ws2.getCell('A'+row).value = sy+'년 시작';
-    ws2.getCell('A'+row).font = subHdrFont;
+  startYears.forEach((sy, sIdx) => {
+    dataCell(ws2, row, 0, sy+'년 시작');
+    ws2.getCell('A'+row).font = F(10,true);
     let rowC=0, rowCh=0;
     calYears.forEach((cy, i) => {
       const d = matrix[cy] && matrix[cy][sy];
       if (d) {
         colC[cy]+=d.credit; colCh[cy]+=d.chugjing;
         rowC+=d.credit; rowCh+=d.chugjing;
-        const cell = ws2.getCell(String.fromCharCode(66+i)+row);
         if (d.chugjing > 0) {
-          cell.value = d.credit + ' (-' + d.chugjing + ')';
-          cell.fill = warnFill;
+          const c = dataCell(ws2, row, i+1, d.credit - d.chugjing, nf);
+          c.font = F(10,false,C.red);
         } else {
-          cell.value = d.credit;
-          cell.numFmt = numFmt;
+          dataCell(ws2, row, i+1, d.credit, nf);
         }
+      } else {
+        dataCell(ws2, row, i+1, '');
       }
     });
     grandCredit+=rowC; grandChug+=rowCh;
-    const totCell = ws2.getCell(String.fromCharCode(66+calYears.length)+row);
-    totCell.value = rowC - rowCh;
-    totCell.numFmt = numFmt;
-    totCell.font = { bold:true, size:10, name:'맑은 고딕' };
-    ws2.getRow(row).eachCell(c => { if(!c.font) c.font = bodyFont; c.border = thinBorder; });
+    const tc = dataCell(ws2, row, calYears.length+1, rowC - rowCh, nf);
+    tc.font = F(10,true);
+    stripeRow(ws2, row, mCols, sIdx%2===1);
     row++;
   });
 
   // 합계행
-  ws2.getCell('A'+row).value = '합계';
-  calYears.forEach((cy, i) => {
-    const cell = ws2.getCell(String.fromCharCode(66+i)+row);
-    const net = colC[cy] - colCh[cy];
-    cell.value = net;
-    cell.numFmt = numFmt;
-  });
-  ws2.getCell(String.fromCharCode(66+calYears.length)+row).value = grandCredit - grandChug;
-  ws2.getCell(String.fromCharCode(66+calYears.length)+row).numFmt = numFmt;
-  styleRow(ws2, row, greenFill, subHdrFont);
+  dataCell(ws2, row, 0, '합계');
+  calYears.forEach((cy, i) => dataCell(ws2, row, i+1, colC[cy]-colCh[cy], nf));
+  dataCell(ws2, row, calYears.length+1, grandCredit - grandChug, nf);
+  totalRow(ws2, row, mCols);
 
-  ws2.columns.forEach((col, i) => { col.width = i===0 ? 16 : 14; });
+  ws2.columns.forEach((col, i) => { col.width = i===0 ? 18 : 13; });
 
   // 저장
   const buf = await wb.xlsx.writeBuffer();
