@@ -257,7 +257,8 @@ let axisFlipped = true;
 
 function fmt(n) { return Math.floor(n).toLocaleString('ko-KR'); }
 function fmtD(n) { return Number.isInteger(n) ? n.toString() : n.toFixed(2); }
-function truncW(n) { return Math.floor(n * 100) / 100; }  // 인원: 소수점 2자리 버림
+function rp2(n) { return Math.round(n * 100) / 100; }      // 부동소수점 합산 오차 보정
+function truncW(n) { return Math.floor(rp2(n) * 100) / 100; }  // 인원: 보정 후 소수점 2자리 버림
 function truncAmt(n) { return Math.floor(n); }             // 금액(만원): 0원이하 버림
 function getCorp() { return document.getElementById('corp-type').value; }
 function getFrom() { return +document.getElementById('year-from').value; }
@@ -269,15 +270,15 @@ function getW(startY, y) {
   const totVal = totEl && totEl.value !== '' ? parseFloat(totEl.value) : null;
   return { ym: g('w'+startY+'-'+y+'-ym'), yl: g('w'+startY+'-'+y+'-yl'), nm: g('w'+startY+'-'+y+'-nm'), nl: g('w'+startY+'-'+y+'-nl'), tot: totVal };
 }
-function totalW(w) { return w.tot !== null && w.tot !== undefined ? w.tot : (w.ym + w.yl + w.nm + w.nl); }
+function totalW(w) { return w.tot !== null && w.tot !== undefined ? w.tot : rp2(w.ym + w.yl + w.nm + w.nl); }
 function updateTotPlaceholder(startY, y) {
   const el = document.getElementById('w'+startY+'-'+y+'-tot');
   if (!el || el.value !== '') return;
   const g = id => { const e = document.getElementById(id); return e ? (parseFloat(e.value) || 0) : 0; };
   el.placeholder = (g('w'+startY+'-'+y+'-ym') + g('w'+startY+'-'+y+'-yl') + g('w'+startY+'-'+y+'-nm') + g('w'+startY+'-'+y+'-nl')).toFixed(2);
 }
-function youthW(w) { return w.ym + w.yl; }
-function diffW(a, b) { return { ym: a.ym-b.ym, yl: a.yl-b.yl, nm: a.nm-b.nm, nl: a.nl-b.nl }; }
+function youthW(w) { return rp2(w.ym + w.yl); }
+function diffW(a, b) { return { ym: rp2(a.ym-b.ym), yl: rp2(a.yl-b.yl), nm: rp2(a.nm-b.nm), nl: rp2(a.nl-b.nl) }; }
 function maxZ(w) { return { ym: Math.max(0,w.ym), yl: Math.max(0,w.yl), nm: Math.max(0,w.nm), nl: Math.max(0,w.nl) }; }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -314,8 +315,8 @@ function calcAddtl(corp, danggiInc, wCheck, wPrev, wDanggi) {
   let inc, amt;
   if (youthDec) {
     // 청년 감소 시: 유지인원을 당기증가 비율로 배분, 모두 비청년 단가 적용
-    const dTotal = danggiInc.ym + danggiInc.yl + danggiInc.nm + danggiInc.nl;
-    const totalKept = Math.max(0, totalW(wCheck) - totalW(wPrev));
+    const dTotal = rp2(danggiInc.ym + danggiInc.yl + danggiInc.nm + danggiInc.nl);
+    const totalKept = Math.max(0, rp2(totalW(wCheck) - totalW(wPrev)));
     const maintained = Math.min(dTotal, totalKept);
     const scale = dTotal > 0 ? maintained / dTotal : 0;
     inc = { ym: truncW(danggiInc.ym*scale), yl: truncW(danggiInc.yl*scale), nm: truncW(danggiInc.nm*scale), nl: truncW(danggiInc.nl*scale) };
@@ -337,10 +338,10 @@ function sahuCheck(corp, wD, wC, dInc, mult) {
   const r = RATES[corp], isS = (corp==='중소');
 
   // 합산 기준 감소/증가
-  const yDec = Math.max(0, youthW(wD)-youthW(wC));       // 청년 합산 감소
-  const nDec = Math.max(0, (totalW(wD)-youthW(wD))-(totalW(wC)-youthW(wC))); // 비청년 합산 감소
-  const tDec = Math.max(0, totalW(wD)-totalW(wC));        // 전체 합산 감소
-  const yInc = dInc.ym + dInc.yl;                         // 당기 청년 합산 증가 (한도용)
+  const yDec = Math.max(0, rp2(youthW(wD)-youthW(wC)));       // 청년 합산 감소
+  const nDec = Math.max(0, rp2(rp2(totalW(wD)-youthW(wD))-rp2(totalW(wC)-youthW(wC)))); // 비청년 합산 감소
+  const tDec = Math.max(0, rp2(totalW(wD)-totalW(wC)));        // 전체 합산 감소
+  const yInc = rp2(dInc.ym + dInc.yl);                         // 당기 청년 합산 증가 (한도용)
 
   // 케이스 판정 (합산)
   let type = 'ok';
@@ -364,12 +365,12 @@ function sahuCheck(corp, wD, wC, dInc, mult) {
     }
   } else {
     // 중소기업: 합산 케이스 판정 + 합산 한도 → 비율 배분 × 지역 단가
-    const ymDec = Math.max(0, wD.ym-wC.ym);  // 수도권 청년 감소
-    const ylDec = Math.max(0, wD.yl-wC.yl);  // 비수도권 청년 감소
-    const nmDec = Math.max(0, wD.nm-wC.nm);  // 수도권 비청년 감소
-    const nlDec = Math.max(0, wD.nl-wC.nl);  // 비수도권 비청년 감소
-    const sumYDec = ymDec+ylDec;  // 지역별 청년감소 합 (합산 yDec과 다를 수 있음)
-    const sumNDec = nmDec+nlDec;  // 지역별 비청년감소 합
+    const ymDec = Math.max(0, rp2(wD.ym-wC.ym));  // 수도권 청년 감소
+    const ylDec = Math.max(0, rp2(wD.yl-wC.yl));  // 비수도권 청년 감소
+    const nmDec = Math.max(0, rp2(wD.nm-wC.nm));  // 수도권 비청년 감소
+    const nlDec = Math.max(0, rp2(wD.nl-wC.nl));  // 비수도권 비청년 감소
+    const sumYDec = rp2(ymDec+ylDec);  // 지역별 청년감소 합 (합산 yDec과 다를 수 있음)
+    const sumNDec = rp2(nmDec+nlDec);  // 지역별 비청년감소 합
     // 비율 (지역별 감소가 0이면 비율도 0)
     const ymR = sumYDec>0 ? ymDec/sumYDec : 0;
     const ylR = sumYDec>0 ? ylDec/sumYDec : 0;
