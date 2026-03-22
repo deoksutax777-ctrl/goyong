@@ -1348,6 +1348,10 @@ function truncHundredth(n) {
   // 100분의 1 미만 버림 = 소수점 셋째자리부터 버림
   return Math.floor(n * 100) / 100;
 }
+function roundP2(n) {
+  // 부동소수점 합산 오차 보정: 소수점 2자리로 반올림
+  return Math.round(n * 100) / 100;
+}
 
 function calcAgg(processed) {
   const months12 = 12;
@@ -1385,23 +1389,23 @@ function calcAgg(processed) {
     .reduce((s,e) => s + (e.regularMonths + e.youthMonths), 0);
 
   // ③ 상시근로자수: 1인당 TRUNC(전체근무개월수/12,2) 합산
-  const workerCount = processed
+  const workerCount = roundP2(processed
     .filter(e => e.regular === 'Y')
-    .reduce((s, e) => s + truncHundredth((e.regularMonths + e.youthMonths) / months12), 0);
+    .reduce((s, e) => s + truncHundredth((e.regularMonths + e.youthMonths) / months12), 0));
 
   // ⑫ 청년등 상시근로자수: 1인당 TRUNC(youthMonths/12,2) 합산
-  const youthWorkerCount = processed
+  const youthWorkerCount = roundP2(processed
     .filter(e => e.regular === 'Y')
-    .reduce((s, e) => s + truncHundredth(e.youthMonths / months12), 0);
+    .reduce((s, e) => s + truncHundredth(e.youthMonths / months12), 0));
 
-  const nonYouthWorkerCount = workerCount - youthWorkerCount;
+  const nonYouthWorkerCount = roundP2(workerCount - youthWorkerCount);
 
   // 수도권/비수도권 분리 집계 (세액공제 계산기 연동용)
   const active = processed.filter(e => e.regular === 'Y');
-  const youthMetro    = active.filter(e => e.metro === 'Y').reduce((s,e) => s + truncHundredth(e.youthMonths / months12), 0);
-  const youthLocal    = active.filter(e => e.metro !== 'Y').reduce((s,e) => s + truncHundredth(e.youthMonths / months12), 0);
-  const nonYouthMetro = active.filter(e => e.metro === 'Y').reduce((s,e) => s + truncHundredth((e.regularMonths + e.youthMonths) / months12), 0) - youthMetro;
-  const nonYouthLocal = active.filter(e => e.metro !== 'Y').reduce((s,e) => s + truncHundredth((e.regularMonths + e.youthMonths) / months12), 0) - youthLocal;
+  const youthMetro    = roundP2(active.filter(e => e.metro === 'Y').reduce((s,e) => s + truncHundredth(e.youthMonths / months12), 0));
+  const youthLocal    = roundP2(active.filter(e => e.metro !== 'Y').reduce((s,e) => s + truncHundredth(e.youthMonths / months12), 0));
+  const nonYouthMetro = roundP2(active.filter(e => e.metro === 'Y').reduce((s,e) => s + truncHundredth((e.regularMonths + e.youthMonths) / months12), 0) - youthMetro);
+  const nonYouthLocal = roundP2(active.filter(e => e.metro !== 'Y').reduce((s,e) => s + truncHundredth((e.regularMonths + e.youthMonths) / months12), 0) - youthLocal);
 
   return {
     totalMonths, months12, workerCount,
