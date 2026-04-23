@@ -2647,8 +2647,6 @@ function calcTimeline(startY) {
     const cy = startY+i;
 
     const wC=getW(startY, cy);
-    const addtl=calcAddtl(corp, danggi.inc, wC, wPrev, wDanggi, startY);
-    const credit=addtl.total;
     let sahu, chugjing=0, limit=0, mult=1, prevChug=0;
 
     if (i===1) {
@@ -2662,6 +2660,28 @@ function calcTimeline(startY) {
       prevChug=p.hasData?p.chugjing:0;
       sahu=sahuCheck(corp, wDanggi, wC, danggi.inc, mult, startY);
       chugjing=truncAmt(Math.min(Math.max(0, sahu.raw-prevChug), Math.max(0, limit-prevChug)));
+    }
+
+    // 추가공제 중단 반영 (§29의7 ②)
+    let credit, addtl;
+    const sahuType = sahu ? sahu.type : 'ok';
+    if (sahuType === 'ok') {
+      // Case ①: 전체·청년 유지 → 당기 공제 전액 반복
+      addtl = { inc: { ym: danggi.inc.ym, yl: danggi.inc.yl, nm: danggi.inc.nm, nl: danggi.inc.nl },
+                amt: danggi.amt, youthDec: false, suspended: null };
+      credit = danggi.total;
+    } else if (sahuType === 'youth_only') {
+      // Case ④: 청년만 감소 → 제1호 적용 안 함, 비청년(제2호)만 공제
+      addtl = { inc: { ym: 0, yl: 0, nm: danggi.inc.nm, nl: danggi.inc.nl },
+                amt: { ym: 0, yl: 0, nm: danggi.amt.nm, nl: danggi.amt.nl },
+                youthDec: true, suspended: 'youth' };
+      credit = danggi.amt.nm + danggi.amt.nl;
+    } else {
+      // Case ②③: 전체 감소 → 제1항 전체 적용 안 함
+      addtl = { inc: { ym: 0, yl: 0, nm: 0, nl: 0 },
+                amt: { ym: 0, yl: 0, nm: 0, nl: 0 },
+                youthDec: false, suspended: 'all' };
+      credit = 0;
     }
 
     tl.push({ year:cy, role:i+'차 추가', credit, chugjing, sahu, hasData:true, addtl, idx:i, limit, mult, prevChug });
@@ -2688,52 +2708,32 @@ window.calcRecalcAll = recalcAll;
 // 검증
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function calcVerification(tl, danggi, corp, startY) {
-  const r = getRates(corp, startY);
-  const wPrev = getW(startY, startY-1);
   const dataItems = tl.filter(t => t.hasData && t.role!=='전기');
   if (dataItems.length <= 1) return null;
 
+  const actualNet = dataItems.reduce((s,t) => s + t.credit - t.chugjing, 0);
+  const actualCredit = dataItems.reduce((s,t) => s + t.credit, 0);
+  const actualChug = dataItems.reduce((s,t) => s + t.chugjing, 0);
+
+  // "처음부터" 검증: 마지막 추가공제 연도 기준 사후관리 상태가
+  // 처음부터 적용되었다면 동일한 순공제 합계가 나오는지 확인
   const last = dataItems[dataItems.length-1];
-  const wLast = getW(startY, last.year);
+  const lastSahuType = last.sahu ? last.sahu.type : 'ok';
+  const numY = dataItems.length;
 
-  const effDiff = diffW(wLast, wPrev);
-  const wDanggi = getW(startY, startY);
-  const youthDec = youthW(wLast) < youthW(wDanggi);
-
-  const totalEffDiff = Math.max(0, totalW(wLast) - totalW(wPrev));
-  const rawEffInc = {
-    ym: Math.min(danggi.inc.ym, Math.max(0, effDiff.ym)),
-    yl: Math.min(danggi.inc.yl, Math.max(0, effDiff.yl)),
-    nm: Math.min(danggi.inc.nm, Math.max(0, effDiff.nm)),
-    nl: Math.min(danggi.inc.nl, Math.max(0, effDiff.nl))
-  };
-
-  let effInc;
-  if (youthDec) {
-    const dTotal = danggi.inc.ym + danggi.inc.yl + danggi.inc.nm + danggi.inc.nl;
-    const maintained = Math.min(dTotal, totalEffDiff);
-    const scale = dTotal > 0 ? maintained / dTotal : 0;
-    effInc = { ym: truncW(danggi.inc.ym*scale), yl: truncW(danggi.inc.yl*scale), nm: truncW(danggi.inc.nm*scale), nl: truncW(danggi.inc.nl*scale) };
+  let fsPerYear;
+  if (lastSahuType === 'ok') {
+    fsPerYear = danggi.total;
+  } else if (lastSahuType === 'youth_only') {
+    fsPerYear = danggi.amt.nm + danggi.amt.nl;
   } else {
-    const sumRaw = rawEffInc.ym + rawEffInc.yl + rawEffInc.nm + rawEffInc.nl;
-    if (sumRaw > totalEffDiff && totalEffDiff >= 0) {
-      const s = sumRaw > 0 ? totalEffDiff / sumRaw : 0;
-      effInc = { ym: truncW(rawEffInc.ym*s), yl: truncW(rawEffInc.yl*s), nm: truncW(rawEffInc.nm*s), nl: truncW(rawEffInc.nl*s) };
-    } else {
-      effInc = rawEffInc;
-    }
+    fsPerYear = 0;
   }
 
-  const yR = youthDec ? r.normal : r.youth;
-  const fsPerYear = truncAmt(effInc.ym*yR.metro) + truncAmt(effInc.yl*yR.local)
-                  + truncAmt(effInc.nm*r.normal.metro) + truncAmt(effInc.nl*r.normal.local);
-  const numY = dataItems.length;
   const fsTotal = fsPerYear * numY;
-  const actualNet = dataItems.reduce((s,t) => s + t.credit - t.chugjing, 0);
   const match = Math.abs(fsTotal - actualNet) < 0.5;
-  const totalEffInc = effInc.ym + effInc.yl + effInc.nm + effInc.nl;
 
-  return { effInc, totalEffInc, fsPerYear, fsTotal, actualNet, numY, match, lastYear: last.year, youthDec };
+  return { fsPerYear, fsTotal, actualNet, actualCredit, actualChug, numY, match, lastYear: last.year, lastSahuType };
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2786,8 +2786,15 @@ function renderTimelines(all) {
         h += `<div class="tl-card-detail">청년+${fmtD(yInc)} / 비청년+${fmtD(nInc)}</div>`;
       } else {
         h += `<div class="tl-card-role"><span class="badge badge-addtl">${item.role}</span></div>`;
-        h += `<div class="tl-card-amount green">+${fmt(item.credit)}만</div>`;
-        if (item.addtl && item.addtl.youthDec) h += `<div style="margin-top:2px;"><span class="badge badge-warn">청년감소→비청년단가</span></div>`;
+        if (item.addtl && item.addtl.suspended === 'all') {
+          h += `<div class="tl-card-amount" style="color:var(--warn);">공제 중단</div>`;
+          h += `<div style="margin-top:2px;"><span class="badge badge-danger">전체감소→공제중단</span></div>`;
+        } else if (item.addtl && item.addtl.suspended === 'youth') {
+          h += `<div class="tl-card-amount" style="color:var(--accent2);">+${fmt(item.credit)}만</div>`;
+          h += `<div style="margin-top:2px;"><span class="badge badge-warn">청년감소→청년공제중단</span></div>`;
+        } else {
+          h += `<div class="tl-card-amount green">+${fmt(item.credit)}만</div>`;
+        }
         if (item.sahu) h += `<div style="margin-top:4px;">${sahuBadge(item.sahu.type)}</div>`;
         if (item.chugjing>0) {
           h += `<div class="tl-card-chug">추징 -${fmt(item.chugjing)}만</div>`;
@@ -2843,16 +2850,28 @@ function renderTimelines(all) {
         if (!item.hasData || item.role==='전기' || item.role==='당기') return;
         h += `${item.role}(${item.year}): `;
         if (item.addtl) {
-          if (item.addtl.youthDec) h += `<span style="color:var(--warn);font-weight:600;">⚠ 청년감소→비청년단가</span> `;
-          const yRate = item.addtl.youthDec ? rt.normal : rt.youth;
-          if (isS) {
-            h += `유지 → 청년 수도권${fmtD(item.addtl.inc.ym)}×${fmt(yRate.metro)} + 비수도권${fmtD(item.addtl.inc.yl)}×${fmt(yRate.local)}`;
-            if (hasN) h += ` + 비청년 수도권${fmtD(item.addtl.inc.nm)}×${fmt(rt.normal.metro)} + 비수도권${fmtD(item.addtl.inc.nl)}×${fmt(rt.normal.local)}`;
+          if (item.addtl.suspended === 'all') {
+            h += `<span style="color:var(--warn);font-weight:600;">⚠ 전체감소 → 추가공제 중단 (§29의7② 제1항 적용 안 함)</span>`;
+            h += ` → <code>0만</code>`;
+          } else if (item.addtl.suspended === 'youth') {
+            h += `<span style="color:var(--warn);font-weight:600;">⚠ 청년감소 → 청년공제 중단 (§29의7② 제1호 적용 안 함)</span> `;
+            if (isS) {
+              h += `비청년만 공제: 수도권${fmtD(item.addtl.inc.nm)}×${fmt(rt.normal.metro)} + 비수도권${fmtD(item.addtl.inc.nl)}×${fmt(rt.normal.local)}`;
+            } else if (hasN) {
+              h += `비청년만 공제: ${fmtD(rp2(item.addtl.inc.nm+item.addtl.inc.nl))}×${fmt(rt.normal.metro)}`;
+            } else {
+              h += `비청년 공제 해당 없음`;
+            }
             h += ` = <code>${fmt(item.credit)}만</code>`;
           } else {
-            const kY = item.addtl.inc.ym+item.addtl.inc.yl, kN = item.addtl.inc.nm+item.addtl.inc.nl;
-            h += `유지 → 청년${fmtD(kY)}×${fmt(yRate.metro)}`;
-            if (hasN) h += ` + 비청년${fmtD(kN)}×${fmt(rt.normal.metro)}`;
+            if (isS) {
+              h += `유지 → 청년 수도권${fmtD(item.addtl.inc.ym)}×${fmt(rt.youth.metro)} + 비수도권${fmtD(item.addtl.inc.yl)}×${fmt(rt.youth.local)}`;
+              if (hasN) h += ` + 비청년 수도권${fmtD(item.addtl.inc.nm)}×${fmt(rt.normal.metro)} + 비수도권${fmtD(item.addtl.inc.nl)}×${fmt(rt.normal.local)}`;
+            } else {
+              const kY = item.addtl.inc.ym+item.addtl.inc.yl, kN = item.addtl.inc.nm+item.addtl.inc.nl;
+              h += `유지 → 청년${fmtD(kY)}×${fmt(rt.youth.metro)}`;
+              if (hasN) h += ` + 비청년${fmtD(kN)}×${fmt(rt.normal.metro)}`;
+            }
             h += ` = <code>${fmt(item.credit)}만</code>`;
           }
         }
@@ -2870,17 +2889,17 @@ function renderTimelines(all) {
       const v = calcVerification(tl, danggi, corp, startY);
       if (v) {
         h += '<div class="f-verify">';
-        h += '<div class="f-title">검증 ("처음부터 감소 상태로 계산")</div>';
-        if (v.youthDec) h += `<span style="color:var(--warn);">※ 청년감소 → 비청년단가 적용</span><br>`;
-        h += `${v.lastYear}년 기준 유효증가: <code>${fmtD(v.totalEffInc)}명</code> → `;
+        h += '<div class="f-title">검증 ("처음부터 최종상태로 계산")</div>';
+        if (v.lastSahuType === 'youth_only') h += `<span style="color:var(--warn);">※ 최종상태: 청년감소 → 비청년 공제만 적용</span><br>`;
+        else if (v.lastSahuType !== 'ok') h += `<span style="color:var(--warn);">※ 최종상태: 전체감소 → 추가공제 중단</span><br>`;
         h += `연 <code>${fmt(v.fsPerYear)}만</code> × ${v.numY}년 = <code>${fmt(v.fsTotal)}만</code><br>`;
-        h += `실제 순공제 합계: <code>${fmt(v.actualNet)}만</code><br>`;
+        h += `실제 순공제 합계: <code>${fmt(v.actualNet)}만</code> (공제 ${fmt(v.actualCredit)}만 - 추징 ${fmt(v.actualChug)}만)<br>`;
         if (v.match) {
           h += `<span class="verify-pass">&#10003; 검증 통과</span> (${fmt(v.fsTotal)}만 = ${fmt(v.actualNet)}만)`;
         } else {
           const diff = v.fsTotal - v.actualNet;
           h += `<span class="verify-fail">&#10007; 불일치</span> (차이: ${fmt(diff)}만`;
-          if (diff > 0) h += ' - 중간연도 추가추징 미환급분 추정';
+          if (diff > 0) h += ' - 중간연도 사후관리 상태 변동에 의한 차이';
           h += ')';
         }
         h += '</div>';
@@ -3109,7 +3128,7 @@ window.calcExportExcel = async function() {
       if(item.role==='전기') return;
       dc(ws,r2,0,item.year+'년'); dc(ws,r2,1,item.role);
       let ci=2;
-      const yDec = item.addtl && item.addtl.youthDec;
+      const suspended = item.addtl && item.addtl.suspended;
       if(item.role==='당기'){
         if(isS){dc(ws,r2,ci++,danggi.inc.ym,nf2);dc(ws,r2,ci++,danggi.inc.yl,nf2);dc(ws,r2,ci++,danggi.inc.nm,nf2);dc(ws,r2,ci++,danggi.inc.nl,nf2);}
         else if(hasN){dc(ws,r2,ci++,rp2(danggi.inc.ym+danggi.inc.yl),nf2);dc(ws,r2,ci++,rp2(danggi.inc.nm+danggi.inc.nl),nf2);}
@@ -3121,17 +3140,19 @@ window.calcExportExcel = async function() {
       }
 
       let amtFormula;
-      if(isS){
+      if(suspended === 'all'){
+        amtFormula='0';
+      } else if(isS){
         const cC=L(2)+r2, dC=L(3)+r2, eC=L(4)+r2, fC=L(5)+r2;
-        if(yDec){
-          amtFormula='INT('+cC+'*'+refNM+')+INT('+dC+'*'+refNL+')+INT('+eC+'*'+refNM+')+INT('+fC+'*'+refNL+')';
+        if(suspended === 'youth'){
+          amtFormula='INT('+eC+'*'+refNM+')+INT('+fC+'*'+refNL+')';
         } else {
           amtFormula='INT('+cC+'*'+refYM+')+INT('+dC+'*'+refYL+')+INT('+eC+'*'+refNM+')+INT('+fC+'*'+refNL+')';
         }
       } else if(hasN){
         const cC=L(2)+r2, dC=L(3)+r2;
-        if(yDec){
-          amtFormula='INT('+cC+'*'+refNM+')+INT('+dC+'*'+refNM+')';
+        if(suspended === 'youth'){
+          amtFormula='INT('+dC+'*'+refNM+')';
         } else {
           amtFormula='INT('+cC+'*'+refYM+')+INT('+dC+'*'+refNM+')';
         }
@@ -3146,7 +3167,8 @@ window.calcExportExcel = async function() {
       fc(ws,r2,netCI,L(amtCI)+r2+'-'+L(chugCI)+r2,item.credit-item.chugjing,nf);
 
       let note='';
-      if(yDec) note+='청년감소→비청년단가 ';
+      if(suspended === 'all') note+='공제중단(전체감소) ';
+      else if(suspended === 'youth') note+='청년공제중단(청년감소) ';
       if(item.sahu&&item.sahu.type!=='ok') note+='사후관리('+item.sahu.type+')';
       dc(ws,r2,cHdr.length-1,note);
 
@@ -3169,9 +3191,12 @@ window.calcExportExcel = async function() {
       ws.getCell('A'+r2).value='검증'; ws.getCell('A'+r2).font=Fn(10,true,C.white);
       ws.getCell('A'+r2).fill=fl(C.pri); ws.getCell('A'+r2).border=bd; ws.getCell('B'+r2).fill=fl(C.pri); ws.getCell('B'+r2).border=bd;
       r2++;
+      const sahuLabel = v.lastSahuType==='ok'?'정상':(v.lastSahuType==='youth_only'?'청년감소→비청년만':'전체감소→공제중단');
       const vRows=[
-        ['유효증가 인원',v.totalEffInc,nf2],['연간 공제액',v.fsPerYear,nf],['적용 연수',v.numY,null],
-        ['"처음부터" 합계',v.fsTotal,nf],['실제 순공제 합계',v.actualNet,nf],
+        ['최종상태',sahuLabel,null],['연간 공제액',v.fsPerYear,nf],['적용 연수',v.numY,null],
+        ['"처음부터" 합계',v.fsTotal,nf],
+        ['실제 공제합계',v.actualCredit,nf],['실제 추징합계',v.actualChug,nf],
+        ['실제 순공제 합계',v.actualNet,nf],
         ['결과',v.match?'검증 통과':'불일치 (차이: '+(v.fsTotal-v.actualNet)+'만)',null],
       ];
       vRows.forEach(([label,val,fmt],idx)=>{
